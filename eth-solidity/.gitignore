@@ -1,0 +1,8 @@
+.idea/
+/build
+.history/
+node_modules/
+gethdata/
+gethdata2/
+coverage/
+coverage.json
