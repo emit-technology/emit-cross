@@ -5,14 +5,14 @@ package utils
 
 import (
 	"github.com/emit-technology/emit-cross/bindings/ethereum/BridgeCounter"
+	"github.com/emit-technology/emit-cross/types"
 	"math/big"
 
-	"github.com/ChainSafe/chainbridge-utils/msg"
 	"github.com/emit-technology/emit-cross/bindings/ethereum/Bridge"
 	"github.com/ethereum/go-ethereum/common"
 )
 
-func RegisterResource(client *Client, bridge, handler common.Address, rId msg.ResourceId, addr common.Address) error {
+func RegisterResource(client *Client, bridge, handler common.Address, rId types.ResourceId, addr common.Address) error {
 	instance, err := Bridge.NewBridge(bridge, client.Client)
 	if err != nil {
 		return err
@@ -64,7 +64,7 @@ func SetBurnable(client *Client, bridge, contract common.Address, resourceId [32
 	return nil
 }
 
-func GetDepositNonce(client *Client, bridgeCounter common.Address, chain msg.ChainId) (uint64, error) {
+func GetDepositNonce(client *Client, bridgeCounter common.Address, chain types.ChainId) (uint64, error) {
 	instance, err := BridgeCounter.NewBridgeCounter(bridgeCounter, client.Client)
 	if err != nil {
 		return 0, err
@@ -76,11 +76,4 @@ func GetDepositNonce(client *Client, bridgeCounter common.Address, chain msg.Cha
 	}
 
 	return count, nil
-}
-
-func IDAndNonce(srcId msg.ChainId, nonce msg.Nonce) *big.Int {
-	var data []byte
-	data = append(data, nonce.Big().Bytes()...)
-	data = append(data, uint8(srcId))
-	return big.NewInt(0).SetBytes(data)
 }

@@ -5,29 +5,23 @@ package ethereum
 
 import (
 	"errors"
-	"math/big"
-	"time"
-
-	"github.com/ChainSafe/chainbridge-utils/msg"
-	utils "github.com/emit-technology/emit-cross/shared/ethereum"
+	"github.com/emit-technology/emit-cross/common"
+	"github.com/emit-technology/emit-cross/types"
+	ethCommon "github.com/ethereum/go-ethereum/common"
+	ethTypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/sero-cash/go-sero/common/hexutil"
 )
 
 // Number of blocks to wait for an finalization event
 const ExecuteBlockWatchLimit = 100
 
-// Time between retrying a failed tx
-const TxRetryInterval = time.Second * 2
-
-// Maximum number of tx retries before exiting
-const TxRetryLimit = 10
+const BlockRetryLimit = 5
 
 var ErrNonceTooLow = errors.New("nonce too low")
 var ErrTxUnderpriced = errors.New("replacement transaction underpriced")
-var ErrFatalTx = errors.New("submission of transaction failed")
-var ErrFatalQuery = errors.New("query of chain state failed")
 
 // proposalIsComplete returns true if the proposal state is either Passed, Transferred or Cancelled
-func (w *writer) proposalIsComplete(srcId msg.ChainId, nonce msg.Nonce, dataHash [32]byte) bool {
+func (w *writer) proposalIsComplete(srcId types.ChainId, nonce types.Nonce, dataHash [32]byte) bool {
 	prop, err := w.bridgeContract.GetProposal(w.conn.CallOpts(), uint8(srcId), uint64(nonce), dataHash)
 	if err != nil {
 		w.log.Error("Failed to check proposal existence", "err", err)
@@ -37,7 +31,7 @@ func (w *writer) proposalIsComplete(srcId msg.ChainId, nonce msg.Nonce, dataHash
 }
 
 // proposalIsComplete returns true if the proposal state is Transferred or Cancelled
-func (w *writer) proposalIsFinalized(srcId msg.ChainId, nonce msg.Nonce, dataHash [32]byte) bool {
+func (w *writer) proposalIsFinalized(srcId types.ChainId, nonce types.Nonce, dataHash [32]byte) bool {
 	prop, err := w.bridgeContract.GetProposal(w.conn.CallOpts(), uint8(srcId), uint64(nonce), dataHash)
 	if err != nil {
 		w.log.Error("Failed to check proposal existence", "err", err)
@@ -47,8 +41,8 @@ func (w *writer) proposalIsFinalized(srcId msg.ChainId, nonce msg.Nonce, dataHas
 }
 
 // hasVoted checks if this relayer has already voted
-func (w *writer) hasVoted(srcId msg.ChainId, nonce msg.Nonce, dataHash [32]byte) bool {
-	hasVoted, err := w.bridgeContract.HasVotedOnProposal(w.conn.CallOpts(), utils.IDAndNonce(srcId, nonce), dataHash, w.conn.Opts().From)
+func (w *writer) hasVoted(srcId types.ChainId, nonce types.Nonce, dataHash [32]byte) bool {
+	hasVoted, err := w.bridgeContract.HasVotedOnProposal(w.conn.CallOpts(), common.IDAndNonce(srcId, nonce), dataHash, w.conn.Opts().From)
 	if err != nil {
 		w.log.Error("Failed to check proposal existence", "err", err)
 		return false
@@ -57,41 +51,55 @@ func (w *writer) hasVoted(srcId msg.ChainId, nonce msg.Nonce, dataHash [32]byte)
 	return hasVoted
 }
 
-func (w *writer) shouldVote(m msg.Message, dataHash [32]byte) bool {
-	// Check if proposal has passed and skip if Passed or Transferred
-	if w.proposalIsComplete(m.Source, m.DepositNonce, dataHash) {
-		w.log.Info("Proposal complete, not voting", "src", m.Source, "nonce", m.DepositNonce)
+func (w *writer) shouldVote(m types.BatchVotes) bool {
+	dataHash := ConstructErc20ProposalDataHash(w.cfg.erc20HandlerContract, ethCommon.BytesToAddress(m.Recipient), m.Amount)
+	if w.proposalIsComplete(m.SourceId, m.DepositNonce, dataHash) {
+		w.log.Info("Proposal complete, not voting", "src", m.SourceId, "nonce", m.DepositNonce)
 		return false
 	}
-
 	// Check if relayer has previously voted
-	if w.hasVoted(m.Source, m.DepositNonce, dataHash) {
-		w.log.Info("Relayer has already voted, not voting", "src", m.Source, "nonce", m.DepositNonce)
+	if w.hasVoted(m.SourceId, m.DepositNonce, dataHash) {
+		w.log.Info("Relayer has already voted, not voting", "src", m.SourceId, "nonce", m.DepositNonce)
 		return false
 	}
 
 	return true
 }
 
-func (w *writer) GetDepositRecord(nonce uint64, dest uint8) (resourceID [32]byte, destinationRecipientAddress []byte, amount *big.Int, err error) {
-	prop, err := w.erc20HandlerContract.GetDepositRecord(w.conn.CallOpts(), nonce, dest)
+// commitVotes submits all votes  for a  proposal
+// a commit will try to be submitted up to the TxRetryLimit times
+func (w *writer) commitVotes(m types.BatchVotes) (*ethTypes.Transaction, error) {
+	err := w.conn.LockAndUpdateOpts()
 	if err != nil {
-		return [32]byte{}, nil, nil, err
+		w.log.Error("Failed to update tx opts", "err", err)
+		return nil, err
 	}
-	return prop.ResourceID, prop.DestinationRecipientAddress, prop.Amount, nil
+	tx, err := w.bridgeContract.CommitVotes(
+		w.conn.Opts(),
+		uint8(m.SourceId),
+		uint64(m.DepositNonce),
+		m.ResourceId,
+		ethCommon.BytesToAddress(m.Recipient),
+		m.Amount,
+		m.Signatures,
+	)
+	w.conn.UnlockOpts()
 
-}
-func (w *writer) PropsalDataHash(recipient []byte, amount []byte) [32]byte {
-	return ConstructErc20ProposalDataHash(w.cfg.erc20HandlerContract, amount, recipient)
-}
-func (w *writer) GetProposalStatus(source uint8, nonce uint64, dataHash [32]byte) (uint8, error) {
-	prop, err := w.bridgeContract.GetProposal(w.conn.CallOpts(), uint8(source), uint64(nonce), dataHash)
-	if err != nil {
-		w.log.Error("Failed to check proposal existence", "err", err)
-		return 0, err
+	if err == nil {
+		w.log.Info("commit erc20 proposal vote signatures",
+			"tx", tx.Hash(),
+			"src", m.SourceId,
+			"depositNonce", m.DepositNonce,
+			"recipient", hexutil.Encode(m.Recipient),
+			"amount", m.Amount.String())
+		if w.metrics != nil {
+			w.metrics.VotesSubmitted.Inc()
+		}
+		return tx, nil
+	} else if err.Error() == ErrNonceTooLow.Error() || err.Error() == ErrTxUnderpriced.Error() {
+		w.log.Debug("Nonce too low, will retry")
+	} else {
+		w.log.Warn("Voting failed", "source", m.SourceId, "dest", m.DestinationId, "depositNonce", m.DepositNonce, "err", err)
 	}
-	return prop.Status, nil
-}
-func (w *writer) GetBridgeAddress() []byte {
-	return w.cfg.bridgeContract.Bytes()
+	return nil, err
 }

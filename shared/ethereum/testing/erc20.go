@@ -4,12 +4,12 @@
 package ethtest
 
 import (
+	"github.com/emit-technology/emit-cross/types"
 	"math/big"
 	"testing"
 
+	"github.com/emit-technology/emit-cross/log"
 	utils "github.com/emit-technology/emit-cross/shared/ethereum"
-	"github.com/ChainSafe/chainbridge-utils/msg"
-	"github.com/ChainSafe/log15"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -89,7 +89,7 @@ func Erc20AssertAllowance(t *testing.T, client *utils.Client, erc20Contract, own
 	log15.Info("Asserted allowance", "owner", owner, "spender", spender, "amount", amount, "erc20Contract", erc20Contract.Hex())
 }
 
-func Erc20AssertResourceMapping(t *testing.T, client *utils.Client, handler common.Address, rId msg.ResourceId, expected common.Address) {
+func Erc20AssertResourceMapping(t *testing.T, client *utils.Client, handler common.Address, rId types.ResourceId, expected common.Address) {
 	addr, err := utils.Erc20GetResourceId(client, handler, rId)
 	if err != nil {
 		t.Fatal(err)

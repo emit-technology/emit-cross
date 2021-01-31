@@ -6,10 +6,10 @@ package ethereum
 import (
 	"errors"
 	"fmt"
+	"github.com/emit-technology/emit-cross/core"
+	"github.com/emit-technology/emit-cross/types"
 	"math/big"
 
-	"github.com/ChainSafe/chainbridge-utils/core"
-	"github.com/ChainSafe/chainbridge-utils/msg"
 	utils "github.com/emit-technology/emit-cross/shared/ethereum"
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -34,11 +34,11 @@ var (
 
 // Config encapsulates all necessary parameters in ethereum compatible forms
 type Config struct {
-	name                 string      // Human-readable chain name
-	id                   msg.ChainId // ChainID
-	endpoint             string      // url for rpc endpoint
-	from                 string      // address of key to use
-	keystorePath         string      // Location of keyfiles
+	name                 string        // Human-readable chain name
+	id                   types.ChainId // ChainID
+	endpoint             string        // url for rpc endpoint
+	from                 string        // address of key to use
+	keystorePath         string        // Location of keyfiles
 	blockstorePath       string
 	freshStart           bool // Disables loading from blockstore at start
 	bridgeContract       common.Address
@@ -60,7 +60,6 @@ func parseChainConfig(chainCfg *core.ChainConfig) (*Config, error) {
 		endpoint:             chainCfg.Endpoint,
 		from:                 chainCfg.From,
 		keystorePath:         chainCfg.KeystorePath,
-		blockstorePath:       chainCfg.BlockstorePath,
 		freshStart:           chainCfg.FreshStart,
 		bridgeContract:       utils.ZeroAddress,
 		erc20HandlerContract: utils.ZeroAddress,

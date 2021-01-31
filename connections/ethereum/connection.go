@@ -7,12 +7,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/emit-technology/emit-cross/crypto/secp256k1"
+	log15 "github.com/emit-technology/emit-cross/log"
 	"math/big"
 	"sync"
 	"time"
 
-	"github.com/ChainSafe/chainbridge-utils/crypto/secp256k1"
-	"github.com/ChainSafe/log15"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
@@ -135,6 +135,7 @@ func (c *Connection) LockAndUpdateOpts() error {
 
 	gasPrice, err := c.SafeEstimateGas(context.TODO())
 	if err != nil {
+		c.optsLock.Unlock()
 		return err
 	}
 	c.opts.GasPrice = gasPrice
@@ -190,7 +191,7 @@ func (c *Connection) WaitForBlock(block *big.Int) error {
 			if currBlock.Cmp(block) >= 0 {
 				return nil
 			}
-			c.log.Trace("Block not ready, waiting", "target", block, "current", currBlock)
+			c.log.Debug("Block not ready, waiting", "target", block, "current", currBlock)
 			time.Sleep(BlockRetryInterval)
 			continue
 		}

@@ -4,14 +4,14 @@
 package ethtest
 
 import (
+	"github.com/emit-technology/emit-cross/types"
 	"testing"
 
-	"github.com/ChainSafe/chainbridge-utils/msg"
 	utils "github.com/emit-technology/emit-cross/shared/ethereum"
 	"github.com/ethereum/go-ethereum/common"
 )
 
-func RegisterResource(t *testing.T, client *utils.Client, bridge, handler common.Address, rId msg.ResourceId, addr common.Address) {
+func RegisterResource(t *testing.T, client *utils.Client, bridge, handler common.Address, rId types.ResourceId, addr common.Address) {
 	err := utils.RegisterResource(client, bridge, handler, rId, addr)
 	if err != nil {
 		t.Fatal(err)
@@ -25,7 +25,7 @@ func SetBurnable(t *testing.T, client *utils.Client, bridge, contract common.Add
 	}
 }
 
-func GetDepositNonce(t *testing.T, client *utils.Client, bridge common.Address, chain msg.ChainId) uint64 {
+func GetDepositNonce(t *testing.T, client *utils.Client, bridge common.Address, chain types.ChainId) uint64 {
 	count, err := utils.GetDepositNonce(client, bridge, chain)
 	if err != nil {
 		t.Fatal(err)

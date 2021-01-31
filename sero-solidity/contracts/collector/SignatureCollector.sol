@@ -9,14 +9,27 @@ contract SignatureCollector  {
 
     address public owner;
 
+    enum ProposalStatus {Inactive, Active, Passed}
+
+    struct Proposal {
+        bytes[] signatures;
+        ProposalStatus status;
+    }
+
+    event SignProposalEvent(uint8 indexed resourceChainId,uint8 indexed destinationChainId ,uint64 indexed depositNonce, ProposalStatus  status);
 
 
-    event SignProposal(uint8 indexed resourceChainId,uint8 indexed destinationChainId ,uint64 indexed depositNonce,bytes signature);
+    mapping(uint72 => mapping(uint64 => mapping(address => bool))) private _hasSignedProposal;
+
+    mapping(uint72 =>uint64) public _destinationStartNonce;
+
+    mapping(uint72 => mapping(uint64 => Proposal)) public destinationProposals;
 
 
-    mapping(uint8 => mapping(uint64 => mapping(address => bool))) public hasSignedProposal;
 
-
+    function coId(uint8 originChainId, uint8 destinationId) public pure returns(uint72) {
+        return ((uint72(originChainId) << 8) | uint72(destinationId));
+    }
 
     /**
    * @dev Throws if called by any account other than the owner.
@@ -41,10 +54,22 @@ contract SignatureCollector  {
         }
     }
 
+
     constructor (address bridgeAccessAddr) public {
+
+        owner = msg.sender;
 
         bridgeAccess = IBridgeAccess(bridgeAccessAddr);
 
+    }
+
+    function hasSignedProposal(uint8 srcId,uint8 destId,uint64 depositNonce,address sender )public view returns(bool){
+        return _hasSignedProposal[coId(srcId,destId)][depositNonce][sender];
+    }
+
+    function getProposalSignatures(uint8 srcId,uint8 destId, uint64 depositNonce) public view returns(ProposalStatus status,bytes[] memory signatures){
+        status = destinationProposals[coId(srcId,destId)][depositNonce].status;
+        signatures = destinationProposals[coId(srcId,destId)][depositNonce].signatures;
     }
 
 
@@ -53,14 +78,42 @@ contract SignatureCollector  {
         bridgeAccess = IBridgeAccess(bridgeAccessAddr);
     }
 
-    function commitSign(uint8 sourceChainId,uint8 destinationChainId, uint64 depositNonce, bytes memory signature ) public onlyRelayer {
-
-        require(!hasSignedProposal[destinationChainId][depositNonce][msg.sender], "relayer already commit sign");
-
-
-        hasSignedProposal[destinationChainId][depositNonce][msg.sender] = true;
-
-        emit SignProposal(sourceChainId,destinationChainId,depositNonce,signature);
+    function setDestinationStartNonce(uint8 srcId,uint8 destId,uint64 startNonce) public onlyOwner {
+        _destinationStartNonce[coId(srcId,destId)] = startNonce;
     }
+    function getDestinationStartNoncee(uint8 srcId,uint8 destId)public view returns(uint64){
+        return _destinationStartNonce[coId(srcId,destId)];
+    }
+
+    function signProposal(uint8 srcId,uint8 destId, uint64 depositNonce, bytes calldata signature) external onlyRelayer  {
+
+        require(depositNonce >= _destinationStartNonce[coId(srcId,destId)], "old depositNonce");
+
+        Proposal storage proposal = destinationProposals[coId(srcId,destId)][depositNonce];
+
+        require(uint(proposal.status) <= 1, "proposal already passed/executed/cancelled");
+
+        require(!_hasSignedProposal[coId(srcId,destId)][depositNonce][msg.sender], "relayer already commit sign");
+
+        _hasSignedProposal[coId(srcId,destId)][depositNonce][msg.sender] = true;
+
+        if (uint(proposal.status) == 0) {
+            proposal.status = ProposalStatus.Active;
+            emit SignProposalEvent(srcId,destId,depositNonce, ProposalStatus.Active);
+        }
+        proposal.signatures.push(signature);
+
+        uint256 _relayerThreshold = bridgeAccess.relayerThreshold();
+
+        if (_relayerThreshold <= 1 || proposal.signatures.length >= _relayerThreshold) {
+
+            proposal.status = ProposalStatus.Passed;
+
+            emit SignProposalEvent(srcId,destId, depositNonce, ProposalStatus.Passed);
+        }
+
+    }
+
+
 
 }

@@ -1,8 +1,8 @@
 pragma solidity 0.6.4;
 pragma experimental ABIEncoderV2;
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
-import '@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol';
+import 'github.com/Uniswap/uniswap-v2-core//contracts/interfaces/IUniswapV2Pair.sol';
+import "github.com/OpenZeppelin/openzeppelin-contracts/contracts/math/SafeMath.sol";
 
 import "./interfaces/ICrossFee.sol";
 
@@ -72,6 +72,10 @@ contract CrossFee is ICrossFee {
 
 
     function calCrossFee(bytes32 resourceId,uint256 inputAmount,uint256 gasPrice) public override view returns(uint256 relayerFee,uint256 gasFee){
+        return _calFee(resourceId,inputAmount,gasPrice);
+    }
+
+    function _calFee(bytes32 resourceId,uint256 inputAmount,uint256 gasPrice) internal view returns(uint256 relayerFee,uint256 gasFee){
         uint256 feeRate = resourceToFeeRate[resourceId];
         relayerFee = inputAmount.mul(feeRate).div(10000);
         gasFee = resourceToDefalutGasFee[resourceId];
@@ -82,29 +86,24 @@ contract CrossFee is ICrossFee {
             }
             uint256 ethFee = crossInGas.mul(gasPrice);
             address tokenAddress = resourceToTokenAddrss[resourceId];
-            (uint reserveA, uint reserveB) =getReserves(uni_factory,weth,tokenAddress);
-            gasFee = quote(ethFee,reserveA,reserveB);
-        }
+            if (weth==tokenAddress){
+                gasFee = ethFee;
+            }else{
+                (uint reserveA, uint reserveB) =getReserves(uni_factory,weth,tokenAddress);
+                gasFee = quote(ethFee,reserveA,reserveB);
+            }
 
+        }
+        return (relayerFee,gasFee);
     }
+
 
 
 
     function estimateFee(bytes32 resourceId,uint256 inputAmount) public override view returns(uint256 fee){
 
-        uint256 feeRate = resourceToFeeRate[resourceId];
-        uint256 relayerFee = inputAmount.mul(feeRate).div(10000);
-
-        uint256 gasFee = resourceToDefalutGasFee[resourceId];
-        if (gasFee == 0){
-            uint256 ethFee = crossInGas.mul( MAX_GAS_PRICE);
-            address tokenAddress = resourceToTokenAddrss[resourceId];
-            (uint reserveA, uint reserveB) =getReserves(uni_factory,weth,tokenAddress);
-            gasFee = quote(ethFee,reserveA,reserveB);
-        }
-        fee = relayerFee.add(gasFee);
-        return fee;
-
+        (uint256 relayerFee,uint256 gasFee) = _calFee(resourceId,inputAmount,MAX_GAS_PRICE);
+        return relayerFee.add(gasFee);
 
     }
 

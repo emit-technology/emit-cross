@@ -8,16 +8,17 @@ import (
 	"fmt"
 	"github.com/emit-technology/emit-cross/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/sero-cash/go-sero/common/hexutil"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/ChainSafe/chainbridge-utils/crypto/secp256k1"
-	"github.com/ChainSafe/chainbridge-utils/keystore"
-	log "github.com/ChainSafe/log15"
 	"github.com/emit-technology/emit-cross/config"
+	"github.com/emit-technology/emit-cross/crypto/secp256k1"
+	"github.com/emit-technology/emit-cross/keystore"
+	log "github.com/emit-technology/emit-cross/log"
 	gokeystore "github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/urfave/cli/v2"
 )
@@ -151,6 +152,7 @@ func handleInspectCmd(ctx *cli.Context, dHandler *dataHandler) error {
 			fmt.Printf("private  key : %s\n", hexutil.Encode(privKey)[2:])
 			fmt.Printf("eth  address : %s\n", kp.Address())
 			fmt.Printf("sero address : %s\n", common.GenCommonAddress(skp).String())
+			fmt.Printf("tron address : %s\n", address.PubkeyToAddress(kp.GetPublicKey()).String())
 			return nil
 		}
 	}
@@ -167,7 +169,7 @@ func getDataDir(ctx *cli.Context) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		log.Trace(fmt.Sprintf("Using keystore dir: %s", datadir))
+		log.Debug(fmt.Sprintf("Using keystore dir: %s", datadir))
 		return datadir, nil
 	}
 	return "", fmt.Errorf("datadir flag not supplied")
@@ -220,6 +222,7 @@ func importPrivKey(ctx *cli.Context, datadir, key string, password []byte) (stri
 	fmt.Printf("========================================== private key imported ==========================================\n")
 	fmt.Printf("eth  address : %s\n", kp.Address())
 	fmt.Printf("sero address : %s\n", common.GenCommonAddress(kp).String())
+	fmt.Printf("tron address : %s\n", address.PubkeyToAddress(kp.GetPublicKey()).String())
 
 	return fp, nil
 
@@ -394,6 +397,7 @@ func generateKeypair(datadir string, password []byte) (string, error) {
 	fmt.Printf("========================================== key generated ==========================================\n")
 	fmt.Printf("eth  address : %s\n", kp.Address())
 	fmt.Printf("sero address : %s\n", common.GenCommonAddress(kp).String())
+	fmt.Printf("tron address : %s\n", address.PubkeyToAddress(kp.GetPublicKey()).String())
 
 	return fp, nil
 }

@@ -8,10 +8,10 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/emit-technology/emit-cross/keystore"
+	"github.com/emit-technology/emit-cross/log"
 	ethutils "github.com/emit-technology/emit-cross/shared/ethereum"
 	ethtest "github.com/emit-technology/emit-cross/shared/ethereum/testing"
-	"github.com/ChainSafe/chainbridge-utils/keystore"
-	"github.com/ChainSafe/log15"
 	ethcmn "github.com/ethereum/go-ethereum/common"
 )
 

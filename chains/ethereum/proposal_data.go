@@ -4,16 +4,17 @@
 package ethereum
 
 import (
-	utils "github.com/emit-technology/emit-cross/shared/ethereum"
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/emit-technology/emit-cross/common"
+	ethCommon "github.com/ethereum/go-ethereum/common"
+	"math/big"
 )
 
-func ConstructErc20ProposalDataHash(handler common.Address, amount []byte, recipient []byte) [32]byte {
+func ConstructErc20ProposalDataHash(handler ethCommon.Address, recipient ethCommon.Address, amount *big.Int) [32]byte {
 	var data []byte
 
 	data = append(data, handler[:]...)
 	data = append(data, recipient[:]...)
-	data = append(data, common.LeftPadBytes(amount, 32)...)
-	return utils.Hash(data)
+	data = append(data, ethCommon.LeftPadBytes(amount.Bytes(), 32)...)
+	return common.Hash(data)
 
 }

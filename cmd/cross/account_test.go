@@ -15,7 +15,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ChainSafe/chainbridge-utils/keystore"
+	"github.com/emit-technology/emit-cross/keystore"
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v2"
 )

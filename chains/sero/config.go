@@ -19,12 +19,11 @@ package sero
 import (
 	"errors"
 	"fmt"
+	"github.com/emit-technology/emit-cross/core"
+	"github.com/emit-technology/emit-cross/types"
 	"math/big"
 
 	"github.com/sero-cash/go-sero/common"
-
-	"github.com/ChainSafe/chainbridge-utils/core"
-	"github.com/ChainSafe/chainbridge-utils/msg"
 )
 
 const DefaultGasLimit = 6721975
@@ -42,46 +41,48 @@ var (
 	HttpOpt               = "http"
 	StartBlockOpt         = "startBlock"
 	BlockConfirmationsOpt = "blockConfirmations"
+	signatureColletorOpt  = "signatureColletor"
 )
 
 // Config encapsulates all necessary parameters in ethereum compatible forms
 type Config struct {
-	name                 string      // Human-readable chain name
-	id                   msg.ChainId // ChainID
-	endpoint             string      // url for rpc endpoint
-	accountEndpoint      string
-	from                 string // address of key to use
-	keystorePath         string // Location of keyfiles
-	blockstorePath       string
-	freshStart           bool // Disables loading from blockstore at start
-	bridgeContract       common.Address
-	src20HandlerContract common.Address
-	gasLimit             *big.Int
-	maxGasPrice          *big.Int
-	http                 bool // Config for type of connection
-	startBlock           *big.Int
-	blockConfirmations   *big.Int
-	commitNode           bool
+	name                     string        // Human-readable chain name
+	id                       types.ChainId // ChainID
+	endpoint                 string        // url for rpc endpoint
+	accountEndpoint          string
+	from                     string // address of key to use
+	keystorePath             string // Location of keyfiles
+	blockstorePath           string
+	freshStart               bool // Disables loading from blockstore at start
+	bridgeContract           common.Address
+	src20HandlerContract     common.Address
+	signatureColletorContact common.Address
+	gasLimit                 *big.Int
+	maxGasPrice              *big.Int
+	http                     bool // Config for type of connection
+	startBlock               *big.Int
+	blockConfirmations       *big.Int
+	commitNode               bool
 }
 
 // parseChainConfig uses a core.ChainConfig to construct a corresponding Config
 func parseChainConfig(chainCfg *core.ChainConfig) (*Config, error) {
 
 	config := &Config{
-		name:                 chainCfg.Name,
-		id:                   chainCfg.Id,
-		endpoint:             chainCfg.Endpoint,
-		from:                 chainCfg.From,
-		keystorePath:         chainCfg.KeystorePath,
-		blockstorePath:       chainCfg.BlockstorePath,
-		freshStart:           chainCfg.FreshStart,
-		bridgeContract:       common.Address{},
-		src20HandlerContract: common.Address{},
-		gasLimit:             big.NewInt(DefaultGasLimit),
-		maxGasPrice:          big.NewInt(DefaultGasPrice),
-		http:                 false,
-		startBlock:           big.NewInt(0),
-		blockConfirmations:   big.NewInt(0),
+		name:                     chainCfg.Name,
+		id:                       chainCfg.Id,
+		endpoint:                 chainCfg.Endpoint,
+		from:                     chainCfg.From,
+		keystorePath:             chainCfg.KeystorePath,
+		freshStart:               chainCfg.FreshStart,
+		bridgeContract:           common.Address{},
+		src20HandlerContract:     common.Address{},
+		signatureColletorContact: common.Address{},
+		gasLimit:                 big.NewInt(DefaultGasLimit),
+		maxGasPrice:              big.NewInt(DefaultGasPrice),
+		http:                     false,
+		startBlock:               big.NewInt(0),
+		blockConfirmations:       big.NewInt(0),
 	}
 
 	if contract, ok := chainCfg.Opts[BridgeOpt]; ok && contract != "" {
@@ -100,7 +101,12 @@ func parseChainConfig(chainCfg *core.ChainConfig) (*Config, error) {
 
 	config.src20HandlerContract = common.Base58ToAddress(chainCfg.Opts[src20HandlerOpt])
 	delete(chainCfg.Opts, src20HandlerOpt)
-
+	if contract, ok := chainCfg.Opts[signatureColletorOpt]; ok && contract != "" {
+		config.signatureColletorContact = common.Base58ToAddress(contract)
+		delete(chainCfg.Opts, signatureColletorOpt)
+	} else {
+		return nil, fmt.Errorf("must provide opts.signatureColletor field for sero config")
+	}
 	if gasPrice, ok := chainCfg.Opts[MaxGasPriceOpt]; ok {
 		price := big.NewInt(0)
 		_, pass := price.SetString(gasPrice, 10)

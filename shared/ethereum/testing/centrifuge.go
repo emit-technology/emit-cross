@@ -6,8 +6,8 @@ package ethtest
 import (
 	"testing"
 
+	"github.com/emit-technology/emit-cross/log"
 	utils "github.com/emit-technology/emit-cross/shared/ethereum"
-	"github.com/ChainSafe/log15"
 	"github.com/ethereum/go-ethereum/common"
 )
 

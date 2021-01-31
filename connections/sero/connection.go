@@ -20,7 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ChainSafe/chainbridge-utils/crypto/secp256k1"
+	"github.com/emit-technology/emit-cross/crypto/secp256k1"
+	log "github.com/emit-technology/emit-cross/log"
 	"github.com/sero-cash/go-sero/crypto"
 	"math/big"
 	"sync"
@@ -35,8 +36,6 @@ import (
 	"github.com/sero-cash/go-sero/rpc"
 	"github.com/sero-cash/go-sero/zero/txtool"
 	"github.com/sero-cash/go-sero/zero/txtool/flight"
-
-	"github.com/ChainSafe/log15"
 )
 
 var BlockRetryInterval = time.Second * 5
@@ -54,12 +53,12 @@ type Connection struct {
 	callOpts *bind.CallOpts
 	//nonce    uint64
 	optsLock sync.Mutex
-	log      log15.Logger
+	log      log.Logger
 	stop     chan int // All routines should exit when this channel is closed
 }
 
 // NewConnection returns an uninitialized connection, must call Connection.Connect() before using.
-func NewConnection(endpoint string, accountEndpoint string, http bool, kp *secp256k1.Keypair, log log15.Logger, gasLimit, gasPrice *big.Int) *Connection {
+func NewConnection(endpoint string, accountEndpoint string, http bool, kp *secp256k1.Keypair, log log.Logger, gasLimit, gasPrice *big.Int) *Connection {
 	return &Connection{
 		endpoint:        endpoint,
 		accountEndpoint: accountEndpoint,
@@ -210,7 +209,7 @@ func (c *Connection) WaitForBlock(block *big.Int) error {
 			if currBlock.Cmp(block) >= 0 {
 				return nil
 			}
-			c.log.Trace("Block not ready, waiting", "target", block, "current", currBlock)
+			c.log.Debug("Block not ready, waiting", "target", block, "current", currBlock)
 			time.Sleep(BlockRetryInterval)
 			continue
 		}

@@ -18,23 +18,21 @@ package sero
 
 import (
 	"fmt"
-	"github.com/ChainSafe/chainbridge-utils/crypto/secp256k1"
-	"github.com/ChainSafe/chainbridge-utils/keystore"
+	"github.com/emit-technology/emit-cross/bindings/sero/Collector"
 	"github.com/emit-technology/emit-cross/chains"
-	"math/big"
-
 	"github.com/emit-technology/emit-cross/common"
+	"github.com/emit-technology/emit-cross/core"
+	"github.com/emit-technology/emit-cross/crypto/secp256k1"
+	"github.com/emit-technology/emit-cross/keystore"
+	log "github.com/emit-technology/emit-cross/log"
+	metrics "github.com/emit-technology/emit-cross/metrics/types"
+	"github.com/emit-technology/emit-cross/types"
+	"math/big"
 
 	"github.com/emit-technology/emit-cross/bindings/sero"
 	"github.com/sero-cash/go-sero/accounts/abi/bind"
 	seroCommon "github.com/sero-cash/go-sero/common"
 
-	"github.com/ChainSafe/chainbridge-utils/blockstore"
-	"github.com/ChainSafe/chainbridge-utils/core"
-
-	metrics "github.com/ChainSafe/chainbridge-utils/metrics/types"
-	"github.com/ChainSafe/chainbridge-utils/msg"
-	"github.com/ChainSafe/log15"
 	bridge "github.com/emit-technology/emit-cross/bindings/sero/Bridge"
 	src20Handler "github.com/emit-technology/emit-cross/bindings/sero/SRC20Handler"
 
@@ -63,33 +61,12 @@ type Chain struct {
 	cfg      *core.ChainConfig // The config of the chain
 	conn     Connection        // THe chains connection
 	listener *listener         // The listener of this chain
-	writer   *writer           // The writer of the chain
 	stop     chan<- int
 }
 
-// checkBlockstore queries the blockstore for the latest known block. If the latest block is
-// greater than cfg.startBlock, then cfg.startBlock is replaced with the latest known block.
-func setupBlockstore(cfg *Config, kp *secp256k1.Keypair) (*blockstore.Blockstore, error) {
-	bs, err := blockstore.NewBlockstore(cfg.blockstorePath, cfg.id, common.GenCommonAddress(kp).String())
-	if err != nil {
-		return nil, err
-	}
-
-	if !cfg.freshStart {
-		latestBlock, err := bs.TryLoadLatestBlock()
-		if err != nil {
-			return nil, err
-		}
-		if latestBlock != nil && latestBlock.Cmp(cfg.startBlock) == 1 {
-			cfg.startBlock = latestBlock
-		}
-	}
-
-	return bs, nil
-}
-
-func InitializeChain(chainCfg *core.ChainConfig, logger log15.Logger, sysErr chan<- error, m *metrics.ChainMetrics) (*Chain, chains.ProposalState, error) {
+func InitializeChain(chainCfg *core.ChainConfig, chainDB *chains.ChainDB, logger log.Logger, sysErr chan<- error, m *metrics.ChainMetrics) (*Chain, core.ProposalState, error) {
 	cfg, err := parseChainConfig(chainCfg)
+
 	if err != nil {
 		return nil, nil, err
 	}
@@ -102,7 +79,7 @@ func InitializeChain(chainCfg *core.ChainConfig, logger log15.Logger, sysErr cha
 
 	kp, _ := kpI.(*secp256k1.Keypair)
 
-	bs, err := setupBlockstore(cfg, kp)
+	err = setupStartBlock(cfg, chainDB, kp)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -142,6 +119,11 @@ func InitializeChain(chainCfg *core.ChainConfig, logger log15.Logger, sysErr cha
 		return nil, nil, err
 	}
 
+	signatureCollectorContract, err := Collector.NewSignatureCollector(cfg.signatureColletorContact, conn.Client())
+	if err != nil {
+		return nil, nil, err
+	}
+
 	if chainCfg.LatestBlock {
 		curr, err := conn.LatestBlock()
 		if err != nil {
@@ -150,26 +132,34 @@ func InitializeChain(chainCfg *core.ChainConfig, logger log15.Logger, sysErr cha
 		cfg.startBlock = curr
 	}
 
-	listener := NewListener(conn, cfg, logger, bs, stop, sysErr, m)
-	listener.setContracts(bridgeContract, src20HandlerContract)
+	listener := NewListener(conn, chainDB, cfg, logger, stop, sysErr, m)
 
 	writer := NewWriter(conn, cfg, logger, stop, sysErr, m)
-	writer.setContract(bridgeContract, src20HandlerContract)
+	writer.setContract(bridgeContract, src20HandlerContract, signatureCollectorContract)
 
 	listener.setWriter(writer)
 
 	return &Chain{
 		cfg:      chainCfg,
 		conn:     conn,
-		writer:   writer,
 		listener: listener,
 		stop:     stop,
 	}, writer, nil
 }
 
-func (c *Chain) SetRouter(r *core.Router) {
-	r.Listen(c.cfg.Id, c.writer)
-	c.listener.setRouter(r)
+func setupStartBlock(cfg *Config, chainDB *chains.ChainDB, kp *secp256k1.Keypair) error {
+
+	if !cfg.freshStart {
+		next, err := chainDB.GetNextPollBlockNum(uint8(cfg.id), common.GenCommonAddress(kp).String())
+		if err != nil {
+			return err
+		}
+
+		if new(big.Int).SetUint64(next).Cmp(cfg.startBlock) == 1 {
+			cfg.startBlock = new(big.Int).SetUint64(next)
+		}
+	}
+	return nil
 }
 
 func (c *Chain) Start() error {
@@ -178,16 +168,11 @@ func (c *Chain) Start() error {
 		return err
 	}
 
-	err = c.writer.start()
-	if err != nil {
-		return err
-	}
-
-	c.writer.log.Debug("Successfully started chain")
+	c.listener.log.Debug("Successfully started chain")
 	return nil
 }
 
-func (c *Chain) Id() msg.ChainId {
+func (c *Chain) Id() types.ChainId {
 	return c.cfg.Id
 }
 
@@ -197,6 +182,10 @@ func (c *Chain) Name() string {
 
 func (c *Chain) LatestBlock() metrics.LatestBlock {
 	return c.listener.latestBlock
+}
+
+func (c *Chain) SetState(state map[types.ChainId]core.ProposalState) {
+	c.listener.state = state
 }
 
 // Stop signals to any running routines to exit

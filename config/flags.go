@@ -4,7 +4,7 @@
 package config
 
 import (
-	log "github.com/ChainSafe/log15"
+	log "github.com/emit-technology/emit-cross/log"
 	"github.com/urfave/cli/v2"
 )
 
@@ -46,6 +46,12 @@ var (
 		Name:  "blockstore",
 		Usage: "Specify path for blockstore",
 		Value: "", // Empty will use home dir
+	}
+
+	DataDirFlag = &cli.StringFlag{
+		Name:  "datadir",
+		Usage: "Data directory for the databases",
+		Value: DefaultDataDir(),
 	}
 
 	FreshStartFlag = &cli.BoolFlag{

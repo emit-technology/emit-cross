@@ -8,8 +8,8 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/emit-technology/emit-cross/crypto/secp256k1"
 	utils "github.com/emit-technology/emit-cross/shared/ethereum"
-	"github.com/ChainSafe/chainbridge-utils/crypto/secp256k1"
 )
 
 func NewClient(t *testing.T, endpoint string, kp *secp256k1.Keypair) *utils.Client {

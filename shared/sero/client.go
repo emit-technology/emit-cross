@@ -6,7 +6,7 @@ package utils
 import (
 	"context"
 	"fmt"
-	"github.com/ChainSafe/chainbridge-utils/crypto/secp256k1"
+	"github.com/emit-technology/emit-cross/crypto/secp256k1"
 	"github.com/sero-cash/go-sero/crypto"
 	"math/big"
 	"sync"
@@ -21,7 +21,6 @@ import (
 	"github.com/sero-cash/go-sero/zero/txtool"
 	"github.com/sero-cash/go-sero/zero/txtool/flight"
 
-	//"github.com/ChainSafe/cross-utils/crypto/secp256k1"
 	"github.com/sero-cash/go-sero/accounts/abi/bind"
 	serotypes "github.com/sero-cash/go-sero/core/types"
 	"github.com/sero-cash/go-sero/rpc"

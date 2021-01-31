@@ -9,9 +9,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/ChainSafe/chainbridge-utils/keystore"
 	bridge "github.com/emit-technology/emit-cross/bindings/ethereum/Bridge"
 	erc20Handler "github.com/emit-technology/emit-cross/bindings/ethereum/ERC20Handler"
+	"github.com/emit-technology/emit-cross/keystore"
 )
 
 var (

@@ -16,6 +16,8 @@ go get -u github.com/goware/modvendor
 rm -rf "$workspace"
 rm -rf "$GOBIN"
 
+go mod vendor
+
 modvendor -copy="**/*.c **/*.h **/*.proto **/*.so **/*.dyld **/*.A **/*.B0 **/*.B1 **/*.H **/*.L **/*.bin" -v
 
 #

@@ -1,28 +1,24 @@
-// Copyright 2020 ChainSafe Systems
-// SPDX-License-Identifier: LGPL-3.0-only
-
 package ethereum
 
 import (
-	"github.com/ChainSafe/chainbridge-utils/msg"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/emit-technology/emit-cross/types"
 )
 
-func (l *listener) handleErc20DepositedEvent(destId msg.ChainId, nonce msg.Nonce) (msg.Message, error) {
+func (l *listener) handleErc20DepositedEvent(blockNumer uint64, destId types.ChainId, nonce types.Nonce) (types.FTTransfer, error) {
 	l.log.Info("Handling Erc20 fungible deposit event", "src", l.cfg.id, "dest", destId, "nonce", nonce)
-
-	record, err := l.erc20HandlerContract.GetDepositRecord(&bind.CallOpts{From: l.conn.Keypair().CommonAddress()}, uint64(nonce), uint8(destId))
+	resourceId, recipient, amount, err := l.writer.GetDepositRecord(uint64(nonce), uint8(destId))
 	if err != nil {
 		l.log.Error("Error Unpacking ERC20 Deposit Record", "src", l.cfg.id, "dest", destId, "nonce", nonce, "err", err)
-		return msg.Message{}, err
+		return types.FTTransfer{}, err
 	}
-
-	return msg.NewFungibleTransfer(
+	return types.FTTransfer{
+		blockNumer,
 		l.cfg.id,
 		destId,
 		nonce,
-		record.Amount,
-		record.ResourceID,
-		record.DestinationRecipientAddress,
-	), nil
+		types.ResourceId(resourceId),
+		recipient,
+		amount,
+	}, nil
+
 }

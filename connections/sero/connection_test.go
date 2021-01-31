@@ -21,8 +21,8 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ChainSafe/chainbridge-utils/keystore"
-	"github.com/ChainSafe/log15"
+	"github.com/emit-technology/emit-cross/keystore"
+	"github.com/emit-technology/emit-cross/log"
 	seroUtils "github.com/emit-technology/emit-cross/shared/sero"
 )
 

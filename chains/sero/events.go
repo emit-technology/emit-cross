@@ -17,33 +17,76 @@
 package sero
 
 import (
-	"github.com/ChainSafe/chainbridge-utils/msg"
-	"github.com/emit-technology/emit-cross/chains"
-	"github.com/emit-technology/emit-cross/common"
-	"github.com/sero-cash/go-sero/accounts/abi/bind"
-	"math/big"
+	"github.com/emit-technology/emit-cross/types"
 )
 
-func (l *listener) handleSrc20DepositedEvent(destId msg.ChainId, nonce msg.Nonce) (msg.Message, error) {
+func (l *listener) handleSrc20DepositedEvent(blockNumer uint64, destId types.ChainId, nonce types.Nonce) (types.FTTransfer, error) {
 	l.log.Info("Handling Src20 fungible deposit event", "src", l.cfg.id, "dest", destId, "nonce", nonce)
 
-	record, err := l.src20HandlerContract.GetDepositRecord(&bind.CallOpts{FromPKr: common.GenMainPkr(l.conn.Keypair())}, uint64(nonce), uint8(destId))
+	resourcId, recipeint, amount, err := l.state[l.cfg.id].GetDepositRecord(uint64(nonce), uint8(destId))
+
 	if err != nil {
 		l.log.Error("Error Unpacking SRC20 Deposit Record", "src", l.cfg.id, "dest", destId, "nonce", nonce, "err", err)
-		return msg.Message{}, err
+		return types.FTTransfer{}, err
 	}
 
-	return msg.Message{
-		Source:       l.cfg.id,
-		Destination:  msg.ChainId(chains.CollectorChainId),
-		Type:         chains.SignProposalReq,
-		DepositNonce: nonce,
-		ResourceId:   record.ResourceID,
-		Payload: []interface{}{
-			record.Amount.Bytes(),
-			record.DestinationRecipientAddress,
-			big.NewInt(0).SetUint64(uint64(destId)).Bytes(),
-		},
+	return types.FTTransfer{
+		blockNumer,
+		l.cfg.id,
+		destId,
+		nonce,
+		types.ResourceId(resourcId),
+		recipeint,
+		amount,
 	}, nil
+}
 
+func (l *listener) handleProposalEvent(blockNumer uint64, soruceId types.ChainId, nonce types.Nonce) (types.FTTransfer, error) {
+
+	l.log.Info("Handling passed Proposal event", "src", soruceId, "dest", l.cfg.id, "nonce", nonce)
+
+	resourcId, recipeint, amount, err := l.state[soruceId].GetDepositRecord(uint64(nonce), uint8(l.cfg.id))
+
+	if err != nil {
+		l.log.Error("Error Unpacking Soruce Deposit Record", "src", soruceId, "dest", l.cfg.id, "nonce", nonce, "err", err)
+		return types.FTTransfer{}, err
+	}
+
+	return types.FTTransfer{
+		blockNumer,
+		soruceId,
+		l.cfg.id,
+		nonce,
+		types.ResourceId(resourcId),
+		recipeint,
+		amount,
+	}, nil
+}
+
+func (l *listener) handleDestProposalEvent(blockNumer uint64, soruceId types.ChainId, destId types.ChainId, nonce types.Nonce) (uint8, types.BatchVotes, error) {
+	l.log.Info("Handling dest passed SignProposal event", "src", soruceId, "dest", destId, "nonce", nonce)
+	resourcId, recipeint, amount, err := l.state[soruceId].GetDepositRecord(uint64(nonce), uint8(destId))
+
+	if err != nil {
+		l.log.Error("Error Unpacking Soruce Deposit Record", "src", soruceId, "dest", destId, "nonce", nonce, "err", err)
+		return 0, types.BatchVotes{}, err
+	}
+	status, signatures, err := l.writer.GetProposalSignatures(uint8(soruceId), uint8(destId), uint64(nonce))
+
+	if err != nil {
+		l.log.Error("Error Unpacking GetProposalSignatures", "src", soruceId, "dest", destId, "nonce", nonce, "err", err)
+
+		return 0, types.BatchVotes{}, err
+	}
+
+	return status, types.BatchVotes{
+		blockNumer,
+		soruceId,
+		destId,
+		nonce,
+		types.ResourceId(resourcId),
+		recipeint,
+		amount,
+		signatures,
+	}, nil
 }

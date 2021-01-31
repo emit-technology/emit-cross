@@ -4,7 +4,7 @@
 package shared
 
 import (
-	log "github.com/ChainSafe/log15"
+	log "github.com/emit-technology/emit-cross/log"
 )
 
 func SetLogger(lvl log.Lvl) {

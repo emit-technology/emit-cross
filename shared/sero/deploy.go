@@ -10,9 +10,9 @@ import (
 
 	seroCommon "github.com/sero-cash/go-sero/common"
 
-	"github.com/ChainSafe/chainbridge-utils/keystore"
 	bridge "github.com/emit-technology/emit-cross/bindings/sero/Bridge"
 	src20Handler "github.com/emit-technology/emit-cross/bindings/sero/SRC20Handler"
+	"github.com/emit-technology/emit-cross/keystore"
 )
 
 var (
@@ -44,7 +44,7 @@ func DeployContracts(client *Client, chainID uint8, initialRelayerThreshold *big
 	if err != nil {
 		return nil, err
 	}
-	singnatureCollectorAddr, err := deploySignatureCollector(client, RelayerAddresses)
+	singnatureCollectorAddr, err := deploySignatureCollector(client, seroCommon.Address{})
 
 	deployedContracts := DeployedContracts{bridgeAddr, erc20HandlerAddr, singnatureCollectorAddr}
 
@@ -83,9 +83,9 @@ func deployERC20Handler(client *Client, bridgeAddress seroCommon.Address) (seroC
 	return erc20HandlerAddr, nil
 }
 
-func deploySignatureCollector(client *Client, relayerAddrs []seroCommon.Address) (seroCommon.Address, error) {
+func deploySignatureCollector(client *Client, access seroCommon.Address) (seroCommon.Address, error) {
 
-	signatureCollectorAddress, tx, _, err := Collector.DeploySignatureCollector(client.Opts, client.Client, relayerAddrs, big.NewInt(1))
+	signatureCollectorAddress, tx, _, err := Collector.DeploySignatureCollector(client.Opts, client.Client, access)
 	if err != nil {
 		return ZeroAddress, err
 	}

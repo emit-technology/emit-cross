@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ChainSafe/chainbridge-utils/core"
+	"github.com/emit-technology/emit-cross/core"
 )
 
 //TestParseChainConfig tests parseChainConfig with all handlerContracts provided

@@ -7,47 +7,43 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
-	"time"
-
-	"github.com/ChainSafe/chainbridge-utils/blockstore"
-	metrics "github.com/ChainSafe/chainbridge-utils/metrics/types"
-	"github.com/ChainSafe/chainbridge-utils/msg"
-	"github.com/ChainSafe/log15"
-	"github.com/emit-technology/emit-cross/bindings/ethereum/Bridge"
-	"github.com/emit-technology/emit-cross/bindings/ethereum/ERC20Handler"
 	"github.com/emit-technology/emit-cross/chains"
+	"github.com/emit-technology/emit-cross/core"
+	"github.com/emit-technology/emit-cross/log"
+	metrics "github.com/emit-technology/emit-cross/metrics/types"
 	utils "github.com/emit-technology/emit-cross/shared/ethereum"
+	"github.com/emit-technology/emit-cross/types"
 	eth "github.com/ethereum/go-ethereum"
 	ethcommon "github.com/ethereum/go-ethereum/common"
+	"math/big"
+	"time"
 )
 
 var BlockRetryInterval = time.Second * 5
-var BlockRetryLimit = 5
-var ErrFatalPolling = errors.New("listener block polling failed")
+
+var WatchDuration = 90 * time.Minute
 
 type listener struct {
-	cfg                  Config
-	conn                 Connection
-	router               chains.Router
-	bridgeContract       *Bridge.Bridge // instance of bound bridge contract
-	erc20HandlerContract *ERC20Handler.ERC20Handler
-	log                  log15.Logger
-	blockstore           blockstore.Blockstorer
-	stop                 <-chan int
-	sysErr               chan<- error // Reports fatal error to core
-	latestBlock          metrics.LatestBlock
-	metrics              *metrics.ChainMetrics
-	blockConfirmations   *big.Int
+	cfg                Config
+	chainDB            *chains.ChainDB
+	conn               Connection
+	writer             *writer
+	log                log15.Logger
+	stop               <-chan int
+	sysErr             chan<- error // Reports fatal error to core
+	latestBlock        metrics.LatestBlock
+	metrics            *metrics.ChainMetrics
+	blockConfirmations *big.Int
+	state              map[types.ChainId]core.ProposalState
 }
 
 // NewListener creates and returns a listener
-func NewListener(conn Connection, cfg *Config, log log15.Logger, bs blockstore.Blockstorer, stop <-chan int, sysErr chan<- error, m *metrics.ChainMetrics) *listener {
+func NewListener(conn Connection, chainDB *chains.ChainDB, cfg *Config, log log15.Logger, stop <-chan int, sysErr chan<- error, m *metrics.ChainMetrics) *listener {
 	return &listener{
 		cfg:                *cfg,
+		chainDB:            chainDB,
 		conn:               conn,
 		log:                log,
-		blockstore:         bs,
 		stop:               stop,
 		sysErr:             sysErr,
 		latestBlock:        metrics.LatestBlock{LastUpdated: time.Now()},
@@ -56,15 +52,8 @@ func NewListener(conn Connection, cfg *Config, log log15.Logger, bs blockstore.B
 	}
 }
 
-// setContracts sets the listener with the appropriate contracts
-func (l *listener) setContracts(bridge *Bridge.Bridge, erc20Handler *ERC20Handler.ERC20Handler) {
-	l.bridgeContract = bridge
-	l.erc20HandlerContract = erc20Handler
-}
-
-// sets the router
-func (l *listener) setRouter(r chains.Router) {
-	l.router = r
+func (l *listener) setWriter(w *writer) {
+	l.writer = w
 }
 
 // start registers all subscriptions provided by the config
@@ -75,8 +64,19 @@ func (l *listener) start() error {
 		err := l.pollBlocks()
 		if err != nil {
 			l.log.Error("Polling blocks failed", "err", err)
+			panic(err)
 		}
 	}()
+	if l.cfg.commitNode {
+		go func() {
+			err := l.commitVotes()
+			if err != nil {
+				l.log.Error("loop commitVotes failed", "err", err)
+				panic(err)
+			}
+		}()
+
+	}
 
 	return nil
 }
@@ -85,25 +85,16 @@ func (l *listener) start() error {
 // Polling begins at the block defined in `l.cfg.startBlock`. Failed attempts to fetch the latest block or parse
 // a block will be retried up to BlockRetryLimit times before continuing to the next block.
 func (l *listener) pollBlocks() error {
-	l.log.Info("Polling Blocks...")
 	var currentBlock = l.cfg.startBlock
-	var retry = BlockRetryLimit
+	l.log.Info("Polling Blocks...", "startBlock", currentBlock.String())
 	for {
 		select {
 		case <-l.stop:
 			return errors.New("polling terminated")
 		default:
-			// No more retries, goto next block
-			if retry == 0 {
-				l.log.Error("Polling failed, retries exceeded")
-				l.sysErr <- ErrFatalPolling
-				return nil
-			}
-
 			latestBlock, err := l.conn.LatestBlock()
 			if err != nil {
 				l.log.Error("Unable to get latest block", "block", currentBlock, "err", err)
-				retry--
 				time.Sleep(BlockRetryInterval)
 				continue
 			}
@@ -120,19 +111,19 @@ func (l *listener) pollBlocks() error {
 				continue
 			}
 
+			if currentBlock.Uint64()%100 == 10 {
+				l.log.Info("Polling Blocks...", "currentBlock", currentBlock.String())
+			}
+
 			// Parse out events
 			err = l.getDepositEventsForBlock(currentBlock)
+
 			if err != nil {
 				l.log.Error("Failed to get events for block", "block", currentBlock, "err", err)
-				retry--
 				continue
 			}
 
 			// Write to block store. Not a critical operation, no need to retry
-			err = l.blockstore.StoreBlock(currentBlock)
-			if err != nil {
-				l.log.Error("Failed to write latest block to blockstore", "block", currentBlock, "err", err)
-			}
 
 			if l.metrics != nil {
 				l.metrics.BlocksProcessed.Inc()
@@ -144,7 +135,12 @@ func (l *listener) pollBlocks() error {
 
 			// Goto next block and reset retry counter
 			currentBlock.Add(currentBlock, big.NewInt(1))
-			retry = BlockRetryLimit
+
+			err = l.chainDB.UpdateNextPollBlockNum(uint8(l.cfg.id), l.conn.Keypair().Address(), currentBlock.Uint64())
+
+			if err != nil {
+				l.log.Error("Failed to write next start block", "block", currentBlock, "err", err)
+			}
 		}
 	}
 }
@@ -160,23 +156,41 @@ func (l *listener) getDepositEventsForBlock(latestBlock *big.Int) error {
 		return fmt.Errorf("unable to Filter Logs: %w", err)
 	}
 
-	// read through the log events and handle their deposit event if handler is recognized
+	ms := []types.FTTransfer{}
+	// read through the log events and handle their deposit event if Handler is recognized
 	for _, log := range logs {
-		var m msg.Message
-		destId := msg.ChainId(log.Topics[1].Big().Uint64())
+		destId := types.ChainId(log.Topics[1].Big().Uint64())
 		//rId := msg.ResourceIdFromSlice(log.Topics[2].Bytes())
-		nonce := msg.Nonce(log.Topics[3].Big().Uint64())
+		nonce := types.Nonce(log.Topics[3].Big().Uint64())
 
-		m, err = l.handleErc20DepositedEvent(destId, nonce)
+		m, err := l.handleErc20DepositedEvent(latestBlock.Uint64(), destId, nonce)
 
 		if err != nil {
 			return err
 		}
 
-		err = l.router.Send(m)
-		if err != nil {
-			l.log.Error("subscription error: failed to route message", "err", err)
+		ms = append(ms, m)
+	}
+
+	if len(ms) > 0 {
+
+		for _, m := range ms {
+			if l.state[m.DestinationId].IsWithCollector() {
+				err = l.chainDB.AddSignReq(m)
+				if err != nil {
+					l.log.Error("chainDB: failed to add sign req", "err", err)
+					return err
+				}
+			} else {
+				err = l.chainDB.AddProposalMsg(m)
+				if err != nil {
+					l.log.Error("chainDB: failed to add sign req", "err", err)
+					return err
+				}
+			}
+
 		}
+
 	}
 
 	return nil

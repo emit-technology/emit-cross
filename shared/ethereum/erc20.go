@@ -4,11 +4,11 @@
 package utils
 
 import (
+	"github.com/emit-technology/emit-cross/types"
 	"math/big"
 
 	"github.com/emit-technology/emit-cross/bindings/ethereum/ERC20Handler"
 	ERC20 "github.com/emit-technology/emit-cross/bindings/ethereum/ERC20PresetMinterPauser"
-	"github.com/ChainSafe/chainbridge-utils/msg"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -216,7 +216,7 @@ func Erc20GetAllowance(client *Client, erc20Contract, owner, spender common.Addr
 	return amount, nil
 }
 
-func Erc20GetResourceId(client *Client, handler common.Address, rId msg.ResourceId) (common.Address, error) {
+func Erc20GetResourceId(client *Client, handler common.Address, rId types.ResourceId) (common.Address, error) {
 	instance, err := ERC20Handler.NewERC20Handler(handler, client.Client)
 	if err != nil {
 		return ZeroAddress, err

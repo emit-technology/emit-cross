@@ -5,16 +5,16 @@ package utils
 
 import (
 	"github.com/emit-technology/emit-cross/bindings/sero/BridgeCounter"
+	"github.com/emit-technology/emit-cross/types"
 	"math/big"
 
-	"github.com/ChainSafe/chainbridge-utils/msg"
 	"github.com/emit-technology/emit-cross/bindings/sero/Bridge"
 	seroCommon "github.com/sero-cash/go-sero/common"
 )
 
 var Max, _ = new(big.Int).SetString("100000000000000000000000000000", 10)
 
-func RegisterResource(client *Client, bridge, handler seroCommon.Address, rId msg.ResourceId, cy string, min *big.Int) error {
+func RegisterResource(client *Client, bridge, handler seroCommon.Address, rId types.ResourceId, cy string, min *big.Int) error {
 	instance, err := Bridge.NewBridge(bridge, client.Client)
 	if err != nil {
 		return err
@@ -33,7 +33,7 @@ func RegisterResource(client *Client, bridge, handler seroCommon.Address, rId ms
 	return nil
 }
 
-func SetResoruceTokenAddress(client *Client, bridge, handler seroCommon.Address, rId msg.ResourceId, addr seroCommon.Address) error {
+func SetResoruceTokenAddress(client *Client, bridge, handler seroCommon.Address, rId types.ResourceId, addr seroCommon.Address) error {
 	instance, err := Bridge.NewBridge(bridge, client.Client)
 	if err != nil {
 		return err
@@ -52,7 +52,7 @@ func SetResoruceTokenAddress(client *Client, bridge, handler seroCommon.Address,
 	return nil
 }
 
-func GetDepositNonce(client *Client, bridge seroCommon.Address, chain msg.ChainId) (uint64, error) {
+func GetDepositNonce(client *Client, bridge seroCommon.Address, chain types.ChainId) (uint64, error) {
 	instance, err := BridgeCounter.NewBridgeCounter(bridge, client.Client)
 	if err != nil {
 		return 0, err
@@ -64,11 +64,4 @@ func GetDepositNonce(client *Client, bridge seroCommon.Address, chain msg.ChainI
 	}
 
 	return count, nil
-}
-
-func IDAndNonce(srcId msg.ChainId, nonce msg.Nonce) *big.Int {
-	var data []byte
-	data = append(data, nonce.Big().Bytes()...)
-	data = append(data, uint8(srcId))
-	return big.NewInt(0).SetBytes(data)
 }

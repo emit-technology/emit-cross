@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/emit-technology/emit-cross/log"
 	utils "github.com/emit-technology/emit-cross/shared/ethereum"
-	"github.com/ChainSafe/log15"
 	eth "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"

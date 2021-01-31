@@ -18,9 +18,11 @@ package common
 
 import (
 	"encoding/binary"
-	"github.com/ChainSafe/chainbridge-utils/crypto/secp256k1"
+	"github.com/emit-technology/emit-cross/crypto/secp256k1"
+	"github.com/emit-technology/emit-cross/types"
 	"github.com/sero-cash/go-czero-import/cpt"
 	"github.com/sero-cash/go-sero/common/address"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/sero-cash/go-czero-import/c_superzk"
@@ -90,3 +92,10 @@ func GenSeroKey(priKey *ecdsa.PrivateKey) *keystore.Key {
 		Version:    1,
 	}
 }*/
+
+func IDAndNonce(srcId types.ChainId, nonce types.Nonce) *big.Int {
+	var data []byte
+	data = append(data, nonce.Big().Bytes()...)
+	data = append(data, uint8(srcId))
+	return big.NewInt(0).SetBytes(data)
+}

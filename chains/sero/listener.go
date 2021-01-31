@@ -20,66 +20,51 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/emit-technology/emit-cross/common"
+	"github.com/emit-technology/emit-cross/core"
+	log "github.com/emit-technology/emit-cross/log"
+	metrics "github.com/emit-technology/emit-cross/metrics/types"
+	"github.com/emit-technology/emit-cross/types"
 	"math/big"
 	"time"
 
-	"github.com/emit-technology/emit-cross/bindings/sero/SRC20Handler"
 	"github.com/sero-cash/go-sero"
 	seroCommon "github.com/sero-cash/go-sero/common"
 
-	"github.com/ChainSafe/chainbridge-utils/blockstore"
-	metrics "github.com/ChainSafe/chainbridge-utils/metrics/types"
-	"github.com/ChainSafe/chainbridge-utils/msg"
-	"github.com/ChainSafe/log15"
-	"github.com/emit-technology/emit-cross/bindings/sero/Bridge"
 	"github.com/emit-technology/emit-cross/chains"
 	utils "github.com/emit-technology/emit-cross/shared/sero"
 )
 
-var BlockRetryInterval = time.Second * 5
-var BlockRetryLimit = 5
-var ErrFatalPolling = errors.New("listener block polling failed")
+var BlockRetryInterval = time.Second * 10
+var WatchDuration = 30 * time.Minute
 
 type listener struct {
-	cfg                  Config
-	conn                 Connection
-	router               chains.Router
-	writer               *writer
-	bridgeContract       *Bridge.Bridge // instance of bound bridge contract
-	src20HandlerContract *SRC20Handler.SRC20Handler
-	log                  log15.Logger
-	blockstore           blockstore.Blockstorer
-	stop                 <-chan int
-	sysErr               chan<- error // Reports fatal error to core
-	latestBlock          metrics.LatestBlock
-	metrics              *metrics.ChainMetrics
-	blockConfirmations   *big.Int
+	cfg                Config
+	chainDB            *chains.ChainDB
+	conn               Connection
+	writer             *writer
+	log                log.Logger
+	stop               <-chan int
+	sysErr             chan<- error // Reports fatal error to core
+	latestBlock        metrics.LatestBlock
+	metrics            *metrics.ChainMetrics
+	blockConfirmations *big.Int
+	state              map[types.ChainId]core.ProposalState
 }
 
 // NewListener creates and returns a listener
-func NewListener(conn Connection, cfg *Config, log log15.Logger, bs blockstore.Blockstorer, stop <-chan int, sysErr chan<- error, m *metrics.ChainMetrics) *listener {
+func NewListener(conn Connection, chainDB *chains.ChainDB, cfg *Config, log log.Logger, stop <-chan int, sysErr chan<- error, m *metrics.ChainMetrics) *listener {
 	return &listener{
 		cfg:                *cfg,
+		chainDB:            chainDB,
 		conn:               conn,
 		log:                log,
-		blockstore:         bs,
 		stop:               stop,
 		sysErr:             sysErr,
 		latestBlock:        metrics.LatestBlock{LastUpdated: time.Now()},
 		metrics:            m,
 		blockConfirmations: cfg.blockConfirmations,
 	}
-}
-
-// setContracts sets the listener with the appropriate contracts
-func (l *listener) setContracts(bridge *Bridge.Bridge, src20Handler *SRC20Handler.SRC20Handler) {
-	l.bridgeContract = bridge
-	l.src20HandlerContract = src20Handler
-}
-
-// sets the router
-func (l *listener) setRouter(r chains.Router) {
-	l.router = r
 }
 
 func (l *listener) setWriter(w *writer) {
@@ -97,6 +82,29 @@ func (l *listener) start() error {
 		}
 	}()
 
+	go func() {
+		err := l.signDestProposal()
+		if err != nil {
+			l.log.Error("start signDestProposal failed", "err", err)
+		}
+	}()
+
+	go func() {
+		err := l.voteProposal()
+		if err != nil {
+			l.log.Error("start voteProposal failed", "err", err)
+		}
+	}()
+
+	if l.cfg.commitNode {
+		go func() {
+			err := l.excueteProposal()
+			if err != nil {
+				l.log.Error("start	 excueteProposal failed", "err", err)
+			}
+		}()
+	}
+
 	return nil
 }
 
@@ -104,25 +112,17 @@ func (l *listener) start() error {
 // Polling begins at the block defined in `l.cfg.startBlock`. Failed attempts to fetch the latest block or parse
 // a block will be retried up to BlockRetryLimit times before continuing to the next block.
 func (l *listener) pollBlocks() error {
-	l.log.Info("Polling Blocks...")
 	var currentBlock = l.cfg.startBlock
-	var retry = BlockRetryLimit
+	l.log.Info("Polling Blocks...", "startBlock", currentBlock.String())
 	for {
 		select {
 		case <-l.stop:
 			return errors.New("polling terminated")
 		default:
-			// No more retries, goto next block
-			if retry == 0 {
-				l.log.Error("Polling failed, retries exceeded")
-				l.sysErr <- ErrFatalPolling
-				return nil
-			}
 
 			latestBlock, err := l.conn.LatestBlock()
 			if err != nil {
 				l.log.Error("Unable to get latest block", "block", currentBlock, "err", err)
-				retry--
 				time.Sleep(BlockRetryInterval)
 				continue
 			}
@@ -138,17 +138,14 @@ func (l *listener) pollBlocks() error {
 				continue
 			}
 
+			if currentBlock.Uint64()%100 == 10 {
+				l.log.Info("Polling Blocks...", "currentBlock", currentBlock.String())
+			}
+
 			err = l.getConcernedEventsForBlock(currentBlock)
 			if err != nil {
 				l.log.Error("Failed to get events for block", "block", currentBlock, "err", err)
-				retry--
 				continue
-			}
-
-			// Write to block store. Not a critical operation, no need to retry
-			err = l.blockstore.StoreBlock(currentBlock)
-			if err != nil {
-				l.log.Error("Failed to write latest block to blockstore", "block", currentBlock, "err", err)
 			}
 
 			if l.metrics != nil {
@@ -161,7 +158,10 @@ func (l *listener) pollBlocks() error {
 
 			// Goto next block and reset retry counter
 			currentBlock.Add(currentBlock, big.NewInt(1))
-			retry = BlockRetryLimit
+			err = l.chainDB.UpdateNextPollBlockNum(uint8(l.cfg.id), common.GenCommonAddress(l.conn.Keypair()).String(), currentBlock.Uint64())
+			if err != nil {
+				l.log.Error("Failed to write latest block to blockstore", "block", currentBlock, "err", err)
+			}
 		}
 	}
 }
@@ -169,33 +169,106 @@ func (l *listener) pollBlocks() error {
 // getConcernedEventsForBlock looks for the deposit event and signature envent in the latest block
 func (l *listener) getConcernedEventsForBlock(latestBlock *big.Int) error {
 	l.log.Debug("Querying block for deposit events", "block", latestBlock)
-	query := buildQuery(l.cfg.bridgeContract, utils.Deposit,
-		latestBlock, latestBlock)
+
+	query := buildQuery([]seroCommon.Address{l.cfg.bridgeContract, l.cfg.signatureColletorContact},
+		latestBlock, latestBlock, utils.Deposit, utils.ProposalEvent, utils.SignProposalEvent)
 
 	// querying for logs
 	logs, err := l.conn.Client().FilterLogs(context.Background(), query)
 	if err != nil {
 		return fmt.Errorf("unable to Filter Logs: %w", err)
 	}
+	signReqMsgs := []types.FTTransfer{}
+	voteReqMsgs := []types.FTTransfer{}
+	proposalExcuteMsgs := []types.FTTransfer{}
+	batchVotesMsgs := []types.BatchVotes{}
 
-	// read through the log events and handle their deposit event if handler is recognized
+	// read through the log events and handle their deposit event if Handler is recognized
 	for _, log := range logs {
 
 		if log.Address == l.cfg.bridgeContract {
-			destId := msg.ChainId(log.Topics[1].Big().Uint64())
-			nonce := msg.Nonce(log.Topics[3].Big().Uint64())
-			m, err := l.handleSrc20DepositedEvent(destId, nonce)
+			if log.Topics[0] == utils.Deposit.GetTopic() {
+				destId := types.ChainId(log.Topics[1].Big().Uint64())
+				nonce := types.Nonce(log.Topics[3].Big().Uint64())
+				m, err := l.handleSrc20DepositedEvent(latestBlock.Uint64(), destId, nonce)
 
-			if err != nil {
-				return err
+				if err != nil {
+					return err
+				}
+
+				if l.state[m.DestinationId].IsWithCollector() {
+					signReqMsgs = append(signReqMsgs, m)
+				} else {
+					voteReqMsgs = append(voteReqMsgs, m)
+				}
+
 			}
-			err = l.router.Send(m)
 
-			if err != nil {
-				l.log.Error("subscription error: failed to route message", "err", err)
-				return err
+			if log.Topics[0] == utils.ProposalEvent.GetTopic() {
+				sourceId := log.Topics[1].Big().Uint64()
+				depositNonce := log.Topics[2].Big().Uint64()
+				status := log.Topics[3].Big().Uint64()
+				if utils.IsPassed(uint8(status)) {
+					m, err := l.handleProposalEvent(latestBlock.Uint64(), types.ChainId(sourceId), types.Nonce(depositNonce))
+					if err != nil {
+						return err
+					}
+					proposalExcuteMsgs = append(proposalExcuteMsgs, m)
+				}
+
 			}
 
+		}
+		if log.Address == l.cfg.signatureColletorContact {
+			sourceId := log.Topics[1].Big().Uint64()
+			destId := log.Topics[2].Big().Uint64()
+			depositNonce := log.Topics[3].Big().Uint64()
+			status := new(big.Int).SetBytes(log.Data).Uint64()
+			if utils.IsPassed(uint8(status)) {
+				_, m, err := l.handleDestProposalEvent(latestBlock.Uint64(), types.ChainId(sourceId), types.ChainId(destId), types.Nonce(depositNonce))
+				if err != nil {
+					return err
+				}
+				batchVotesMsgs = append(batchVotesMsgs, m)
+			}
+		}
+
+		if len(signReqMsgs) > 0 {
+			for _, m := range signReqMsgs {
+				err = l.chainDB.AddSignReq(m)
+				if err != nil {
+					l.log.Error("chainDB: failed to add sign req", "err", err)
+					return err
+				}
+			}
+		}
+		if len(voteReqMsgs) > 0 {
+			for _, m := range voteReqMsgs {
+				err = l.chainDB.AddProposalMsg(m)
+				if err != nil {
+					l.log.Error("chainDB: failed to add vote req", "err", err)
+					return err
+				}
+			}
+		}
+		if len(proposalExcuteMsgs) > 0 {
+			for _, m := range proposalExcuteMsgs {
+				err = l.chainDB.AddExecuteMsg(m)
+				if err != nil {
+					l.log.Error("chainDB: failed to add  ExecuteMsg", "err", err)
+					return err
+				}
+			}
+		}
+
+		if len(batchVotesMsgs) > 0 {
+			for _, m := range batchVotesMsgs {
+				err = l.chainDB.AddBatchVotesMsg(m)
+				if err != nil {
+					l.log.Error("chainDB: failed to add  batchVotesMsg", "err", err)
+					return err
+				}
+			}
 		}
 	}
 
@@ -203,14 +276,50 @@ func (l *listener) getConcernedEventsForBlock(latestBlock *big.Int) error {
 }
 
 // buildQuery constructs a query for the bridgeContract by hashing sig to get the event topic
-func buildQuery(contract seroCommon.Address, sig utils.EventSig, startBlock *big.Int, endBlock *big.Int) sero.FilterQuery {
+func buildQuery(contracts []seroCommon.Address, startBlock *big.Int, endBlock *big.Int, sigs ...utils.EventSig) sero.FilterQuery {
+	topics := []seroCommon.Hash{}
+	for _, sig := range sigs {
+		topics = append(topics, sig.GetTopic())
+	}
 	query := sero.FilterQuery{
 		FromBlock: startBlock,
 		ToBlock:   endBlock,
-		Addresses: []seroCommon.Address{contract},
+		Addresses: contracts,
 		Topics: [][]seroCommon.Hash{
-			{sig.GetTopic()},
+			topics,
 		},
 	}
 	return query
+}
+
+// proposalIsComplete returns true if the proposal state is either Passed, Transferred or Cancelled
+func (l *listener) DestProposalIsComplete(srcId types.ChainId, dest types.ChainId, nonce types.Nonce) bool {
+	_, r, a, e := l.state[srcId].GetDepositRecord(uint64(nonce), uint8(dest))
+	if e != nil {
+		l.log.Error("Failed to check deposit existence", "err", e)
+		return false
+	}
+	dataHash := l.state[dest].PropsalDataHash(r, a)
+	prop, err := l.state[dest].GetProposalStatus(uint8(srcId), uint64(nonce), dataHash)
+	if err != nil {
+		l.log.Error("Failed to check proposal existence", "err", err)
+		return false
+	}
+	return prop == PassedStatus || prop == TransferredStatus || prop == CancelledStatus
+}
+
+func (l *listener) shouldSign(m types.FTTransfer) bool {
+	// Check if proposal has passed and skip if Passed or Transferred
+	if l.DestProposalIsComplete(m.SourceId, m.DestinationId, m.DepositNonce) {
+		l.log.Info("Proposal On dest chain complete", "src", m.SourceId, "dest", m.DestinationId, "nonce", m.DepositNonce)
+		return false
+	}
+
+	// Check if relayer has previously voted
+	if l.writer.hasSigned(m.SourceId, m.DestinationId, m.DepositNonce) {
+		l.log.Info("Relayer has already sign", "src", m.SourceId, "dest", m.DestinationId, "nonce", m.DepositNonce)
+		return false
+	}
+
+	return true
 }

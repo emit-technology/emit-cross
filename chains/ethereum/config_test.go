@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ChainSafe/chainbridge-utils/core"
+	"github.com/emit-technology/emit-cross/core"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -42,18 +42,18 @@ func TestParseChainConfig(t *testing.T) {
 	}
 
 	expected := Config{
-		name:                   "chain",
-		id:                     1,
-		endpoint:               "endpoint",
-		from:                   "0x0",
-		keystorePath:           "./keys",
-		bridgeContract:         common.HexToAddress("0x1234"),
-		erc20HandlerContract:   common.HexToAddress("0x1234"),
-		gasLimit:               big.NewInt(10),
-		maxGasPrice:            big.NewInt(20),
-		http:                   true,
-		startBlock:             big.NewInt(10),
-		blockConfirmations:     big.NewInt(50),
+		name:                 "chain",
+		id:                   1,
+		endpoint:             "endpoint",
+		from:                 "0x0",
+		keystorePath:         "./keys",
+		bridgeContract:       common.HexToAddress("0x1234"),
+		erc20HandlerContract: common.HexToAddress("0x1234"),
+		gasLimit:             big.NewInt(10),
+		maxGasPrice:          big.NewInt(20),
+		http:                 true,
+		startBlock:           big.NewInt(10),
+		blockConfirmations:   big.NewInt(50),
 	}
 
 	if !reflect.DeepEqual(&expected, out) {

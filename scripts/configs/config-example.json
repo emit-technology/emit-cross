@@ -2,27 +2,27 @@
   "keyFile": "ff93b45308fd417df303d6515ab04d9e89a750ca",
   "chains": [
     {
-      "name" : "collector",
-      "type" : "collector",
-      "id" : "0",
-      "endpoint" : "ws://127.0.0.1:8548",
-      "opts" : {
-        "gasLimit" : "1000000",
-        "signatureColletor": "KMF87VB3neGeEfGjpJN8QmjJwvNzB75BmbpRvvV7ZPEDbMJJTMAYDdzs7kQ5Ji25L5AVWKSnwUyFCSrhovwAhpK",
-        "accountEndpoint":"http://127.0.0.1:8547",
-        "startBlock":  "0",
-        "blockConfirmations":"0"
-      }
-    },
-    {
       "name" : "eth",
       "type" : "ethereum",
       "id" : "1",
-      "endpoint" : "ws://127.0.0.1:8746",
+      "endpoint" : "ws://127.0.0.1:8546",
       "opts" : {
         "bridge" : "0xC7c287200D0952d4f591509463fD5203C7D88F56",
         "erc20Handler": "0xB47E605e2daAfBD2A3F44216c47033FE71c96A2F",
         "startBlock":  "0",
+        "blockConfirmations":"0",
+        "commitNode":"true"
+      }
+    },
+    {
+      "name" : "tron",
+      "type" : "tron",
+      "id" : "3",
+      "endpoint" : "grpc.shasta.trongrid.io:50051",
+      "opts" : {
+        "bridge" : "TAongUaLfhatu89hZAxgkinS57zfViBYMj",
+        "trc20Handler": "TSg3up7xpeKTMSBs7PVwxrynuxQXJknqc4",
+        "startBlock":  "11894910",
         "blockConfirmations":"0",
         "commitNode":"true"
       }
@@ -34,8 +34,9 @@
       "endpoint" : "ws://127.0.0.1:8548",
       "opts" : {
         "gasLimit" : "1000000",
-        "bridge" : "tCWmQ5NbUxm2y7HxZaKrfd3KzaLehyTFHPdqq5vPdj4rFHig23kNxNG7Y3Dk2ST3YS1D9GoUtaNskR3xsDobTbz",
-        "src20Handler": "2HwsEHQEDTt68r3TB6Q4hCZGprafiwxjvhj31zVJNTbStUogNeLKeXcVWAiGq4zDSqP2qibJLdeHr7YJZkovgs52",
+        "bridge" : "5Pnnu6DNrgctaoNPRfKUww3KroYFFaeGLTZphJMGbP6EHtejuRcVT86jMwgBeWtiiDujnmrQpPhdzGhwzaWxj49b",
+        "src20Handler": "5Z2jSbr7jXBX31qKbNneaFD4NLkv6EwLqVnUsrw5KAQzdFJZHyndq9eZs3Su2LLVC1NsVpB545XDrFm1NoKwgHn8",
+        "signatureColletor": "5wmfT3haPS6sYvMSNF7PSGCpXnk7Xr2jBbj5QH5NrxNksEbbBEUhxDXtBhgXo3BJ78twSvT38buqobrWf17if6Tm",
         "accountEndpoint":"http://127.0.0.1:8547",
         "startBlock":  "0",
         "blockConfirmations":"0",

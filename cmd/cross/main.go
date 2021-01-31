@@ -11,22 +11,23 @@ import (
 	"errors"
 	"fmt"
 	"github.com/emit-technology/emit-cross/chains"
-	"github.com/emit-technology/emit-cross/chains/collector"
+	"github.com/emit-technology/emit-cross/chains/tron"
+	"github.com/emit-technology/emit-cross/core"
+	log "github.com/emit-technology/emit-cross/log"
+	"github.com/emit-technology/emit-cross/types"
 	"net/http"
 	"os"
-	"path/filepath"
+	"os/signal"
 	"strconv"
+	"syscall"
 
 	"github.com/emit-technology/emit-cross/chains/ethereum"
 
 	"github.com/emit-technology/emit-cross/chains/sero"
 
-	"github.com/ChainSafe/chainbridge-utils/core"
-	"github.com/ChainSafe/chainbridge-utils/metrics/health"
-	metrics "github.com/ChainSafe/chainbridge-utils/metrics/types"
-	"github.com/ChainSafe/chainbridge-utils/msg"
-	log "github.com/ChainSafe/log15"
 	"github.com/emit-technology/emit-cross/config"
+	"github.com/emit-technology/emit-cross/metrics/health"
+	metrics "github.com/emit-technology/emit-cross/metrics/types"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/urfave/cli/v2"
 )
@@ -39,6 +40,7 @@ var cliFlags = []cli.Flag{
 	config.KeystorePathFlag,
 	config.KeyFileFlag,
 	config.BlockstorePathFlag,
+	config.DataDirFlag,
 	config.FreshStartFlag,
 	config.LatestBlockFlag,
 	config.MetricsFlag,
@@ -147,22 +149,13 @@ func startLogger(ctx *cli.Context) error {
 	return nil
 }
 
-func getDefaultPath(pathPostfix string) (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-
-	return filepath.Join(home, pathPostfix), nil
-}
-
 func run(ctx *cli.Context) error {
 	err := startLogger(ctx)
 	if err != nil {
 		return err
 	}
 
-	log.Info("Starting ChainBridge...")
+	log.Info("Starting emit-cross...")
 
 	cfg, err := config.GetConfig(ctx)
 	if err != nil {
@@ -186,58 +179,16 @@ func run(ctx *cli.Context) error {
 
 	// Used to signal core shutdown due to fatal error
 	sysErr := make(chan error)
-	c := core.NewCore(sysErr)
-
-	blockStorePath := ctx.String(config.BlockstorePathFlag.Name)
-	if blockStorePath == "" {
-		blockStorePath, _ = getDefaultPath(".emit-cross/blockstore")
+	dataDir := ctx.String(config.DataDirFlag.Name)
+	chainDB, err := chains.NewChainDB(dataDir, 0, 0)
+	if err != nil {
+		return err
 	}
 
-	if len(cfg.Chains) < 3 {
-		return errors.New("invalid chains config")
-	}
-	var collectorChain *collector.Chain
-	var crossChains []config.RawChainConfig
+	//var chainConfigs []config.RawChainConfig
+	var crossChains []core.Chain
+	state := map[types.ChainId]core.ProposalState{}
 	for _, chain := range cfg.Chains {
-		if chain.Type == "collector" {
-
-			chainConfig := &core.ChainConfig{
-				Name:           chain.Name,
-				Id:             msg.ChainId(chains.CollectorChainId),
-				Endpoint:       chain.Endpoint,
-				From:           kf,
-				KeystorePath:   ks,
-				Insecure:       insecure,
-				BlockstorePath: blockStorePath,
-				FreshStart:     ctx.Bool(config.FreshStartFlag.Name),
-				LatestBlock:    ctx.Bool(config.LatestBlockFlag.Name),
-				Opts:           chain.Opts,
-			}
-
-			var m *metrics.ChainMetrics
-
-			logger := log.Root().New("chain", chainConfig.Name)
-
-			if ctx.Bool(config.MetricsFlag.Name) {
-				m = metrics.NewChainMetrics(chain.Name)
-			}
-
-			collectorChain, err = collector.InitializeChain(chainConfig, logger, sysErr, m)
-
-			if err != nil {
-				return err
-			}
-			c.AddChain(collectorChain)
-
-		} else {
-			crossChains = append(crossChains, chain)
-		}
-	}
-	if collectorChain == nil {
-		return errors.New("not config collector")
-	}
-
-	for _, chain := range crossChains {
 		chainId, errr := strconv.Atoi(chain.Id)
 		if errr != nil {
 			return errr
@@ -246,19 +197,18 @@ func run(ctx *cli.Context) error {
 			return errors.New("only collector chainId is 0")
 		}
 		chainConfig := &core.ChainConfig{
-			Name:           chain.Name,
-			Id:             msg.ChainId(chainId),
-			Endpoint:       chain.Endpoint,
-			From:           kf,
-			KeystorePath:   ks,
-			Insecure:       insecure,
-			BlockstorePath: blockStorePath,
-			FreshStart:     ctx.Bool(config.FreshStartFlag.Name),
-			LatestBlock:    ctx.Bool(config.LatestBlockFlag.Name),
-			Opts:           chain.Opts,
+			Name:         chain.Name,
+			Id:           types.ChainId(chainId),
+			Endpoint:     chain.Endpoint,
+			From:         kf,
+			KeystorePath: ks,
+			Insecure:     insecure,
+			FreshStart:   ctx.Bool(config.FreshStartFlag.Name),
+			LatestBlock:  ctx.Bool(config.LatestBlockFlag.Name),
+			Opts:         chain.Opts,
 		}
 		var newChain core.Chain
-		var propState chains.ProposalState
+		var propState core.ProposalState
 		var m *metrics.ChainMetrics
 
 		logger := log.Root().New("chain", chainConfig.Name)
@@ -268,9 +218,12 @@ func run(ctx *cli.Context) error {
 		}
 
 		if chain.Type == "ethereum" {
-			newChain, propState, err = ethereum.InitializeChain(chainConfig, logger, sysErr, m)
+			newChain, propState, err = ethereum.InitializeChain(chainConfig, chainDB, logger, sysErr, m)
+
 		} else if chain.Type == "sero" {
-			newChain, propState, err = sero.InitializeChain(chainConfig, logger, sysErr, m)
+			newChain, propState, err = sero.InitializeChain(chainConfig, chainDB, logger, sysErr, m)
+		} else if chain.Type == "tron" {
+			newChain, propState, err = tron.InitializeChain(chainConfig, chainDB, logger, sysErr, m)
 		} else {
 			return errors.New("unrecognized Chain Type")
 		}
@@ -278,8 +231,8 @@ func run(ctx *cli.Context) error {
 		if err != nil {
 			return err
 		}
-		c.AddChain(newChain)
-		collectorChain.AddPropState(uint8(chainId), propState)
+		state[chainConfig.Id] = propState
+		crossChains = append(crossChains, newChain)
 
 	}
 
@@ -294,7 +247,7 @@ func run(ctx *cli.Context) error {
 				return err
 			}
 		}
-		h := health.NewHealthServer(port, c.Registry, int(blockTimeout))
+		h := health.NewHealthServer(port, crossChains, int(blockTimeout))
 
 		go func() {
 			http.Handle("/metrics", promhttp.Handler())
@@ -308,7 +261,27 @@ func run(ctx *cli.Context) error {
 		}()
 	}
 
-	c.Start()
+	for _, chain := range crossChains {
+		chain.SetState(state)
+		chain.Start()
+	}
+
+	sigc := make(chan os.Signal, 1)
+	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigc)
+
+	// Block here and wait for a signal
+	select {
+	case err := <-sysErr:
+		log.Error("FATAL ERROR. Shutting down.", "err", err)
+	case <-sigc:
+		log.Warn("Interrupt received, shutting down now.")
+	}
+
+	// Signal chains to shutdown
+	for _, chain := range crossChains {
+		chain.Stop()
+	}
 
 	return nil
 }

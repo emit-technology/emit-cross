@@ -18,7 +18,6 @@ package sero
 
 import (
 	"github.com/emit-technology/emit-cross/common"
-	utils "github.com/emit-technology/emit-cross/shared/sero"
 	seroCommon "github.com/sero-cash/go-sero/common"
 	"math/big"
 )
@@ -31,6 +30,6 @@ func ConstructSrc20ProposalDataHash(handler seroCommon.Address, recipient seroCo
 	data = append(data, seroCommon.LeftPadBytes(recipientAddr[:], 20)...)
 	data = append(data, seroCommon.LeftPadBytes(amount.Bytes(), 32)...)
 
-	return utils.Hash(data)
+	return common.Hash(data)
 
 }

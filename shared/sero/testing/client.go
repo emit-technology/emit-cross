@@ -5,15 +5,14 @@ package serotest
 
 import (
 	"context"
-	"github.com/ChainSafe/chainbridge-utils/crypto/secp256k1"
+	"github.com/emit-technology/emit-cross/crypto/secp256k1"
 	utils "github.com/emit-technology/emit-cross/shared/sero"
 	"math/big"
 	"testing"
 )
 
-
 func NewClient(t *testing.T, endpoint string, kp *secp256k1.Keypair) *utils.Client {
-	client, err := utils.NewClient(endpoint,endpoint, kp)
+	client, err := utils.NewClient(endpoint, endpoint, kp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -27,4 +26,3 @@ func GetLatestBlock(t *testing.T, client *utils.Client) *big.Int {
 	}
 	return block.Number()
 }
-
