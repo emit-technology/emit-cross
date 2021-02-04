@@ -19,9 +19,9 @@ import (
 	"time"
 )
 
-var BlockRetryInterval = time.Second * 5
+var BlockRetryInterval = time.Second * 10
 
-var WatchDuration = 90 * time.Minute
+var WatchDuration = 60 * 90 // 90 Minute
 
 type listener struct {
 	cfg                Config

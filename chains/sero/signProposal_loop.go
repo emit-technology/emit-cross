@@ -27,11 +27,7 @@ import (
 )
 
 func (l *listener) signDestProposal() error {
-	lastId, err := l.chainDB.GetLastSignId(uint8(l.cfg.id), common.GenCommonAddress(l.conn.Keypair()).String())
-	if err != nil {
-		panic(err)
-	}
-	nextId := lastId + 1
+	nextId := l.cfg.SignMsgStartSeq.Uint64()
 	l.log.Info("start signDestProposal...", "startWith", nextId)
 
 	for {

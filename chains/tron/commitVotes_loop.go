@@ -25,13 +25,43 @@ import (
 	"time"
 )
 
-func (l *listener) commitVotes() error {
-	lastId, err := l.chainDB.GetLastBatchVotesId(uint8(l.cfg.id), address.PubkeyToAddress(l.conn.Keypair().GetPublicKey()).String())
-	nextId := lastId + 1
-	l.log.Info("start commitVotes...", "startWith", nextId)
-	if err != nil {
-		panic(err)
+func (l *listener) repairCommitVotes(seqs []uint64) {
+
+	for _, seq := range seqs {
+		m, err := l.chainDB.GetBatchVotesById(uint8(l.cfg.id), seq)
+		if err != nil {
+			if err != queue.ErrEmpty && err != queue.ErrOutOfBounds {
+				l.log.Error("Failed to get executeMsg by Id", "id", seq, "err", err)
+				continue
+			}
+
+		} else {
+			panic(err)
+		}
+		dataHash := ConstructTrc20ProposalDataHash(l.cfg.trc20HandlerContract, m.Recipient, m.Amount)
+		if !l.writer.proposalIsFinalized(m.SourceId, m.DepositNonce, dataHash) {
+			l.log.Info("commitVotes", "seq", seq, "src", m.SourceId, "dst", m.DestinationId, "nonce", m.DepositNonce,
+				"recipient", tronCommon.EncodeCheck(m.Recipient),
+				"amount", m.Amount.String())
+			tx, err := l.writer.commitVotes(*m)
+			if err != nil {
+				l.log.Error("Failed to executeProposal", "id", seq, "err", err)
+				continue
+			}
+			go l.wacthCommitVotesResult(*m, tx.Txid)
+		}
+
 	}
+
+}
+
+func (l *listener) commitVotes_loop() error {
+	//lastId, err := l.chainDB.GetLastBatchVotesId(uint8(l.cfg.id), address.PubkeyToAddress(l.conn.Keypair().GetPublicKey()).String())
+	nextId := l.cfg.commitVotesStartSeq.Uint64()
+	l.log.Info("start commitVotes...", "startWith", l.cfg.commitVotesStartSeq)
+	//if err != nil {
+	//	panic(err)
+	//}
 	for {
 		select {
 		case <-l.stop:
@@ -46,9 +76,10 @@ func (l *listener) commitVotes() error {
 				continue
 			}
 			dataHash := ConstructTrc20ProposalDataHash(l.cfg.trc20HandlerContract, m.Recipient, m.Amount)
-
 			if !l.writer.proposalIsFinalized(m.SourceId, m.DepositNonce, dataHash) {
-
+				l.log.Info("commitVotes", "seq", nextId, "src", m.SourceId, "dst", m.DestinationId, "nonce", m.DepositNonce,
+					"recipient", tronCommon.EncodeCheck(m.Recipient),
+					"amount", m.Amount.String())
 				tx, err := l.writer.commitVotes(*m)
 				if err != nil {
 					l.log.Error("Failed to executeProposal", "id", nextId, "err", err)

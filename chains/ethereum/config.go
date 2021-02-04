@@ -20,16 +20,17 @@ const DefaultBlockConfirmations = 12
 
 // Chain specific options
 var (
-	BridgeOpt             = "bridge"
-	Erc20HandlerOpt       = "erc20Handler"
-	Erc721HandlerOpt      = "erc721Handler"
-	GenericHandlerOpt     = "genericHandler"
-	MaxGasPriceOpt        = "maxGasPrice"
-	GasLimitOpt           = "gasLimit"
-	HttpOpt               = "http"
-	StartBlockOpt         = "startBlock"
-	commitNodeOpt         = "commitNode"
-	BlockConfirmationsOpt = "blockConfirmations"
+	BridgeOpt              = "bridge"
+	Erc20HandlerOpt        = "erc20Handler"
+	Erc721HandlerOpt       = "erc721Handler"
+	GenericHandlerOpt      = "genericHandler"
+	MaxGasPriceOpt         = "maxGasPrice"
+	GasLimitOpt            = "gasLimit"
+	HttpOpt                = "http"
+	StartBlockOpt          = "startBlock"
+	commitNodeOpt          = "commitNode"
+	BlockConfirmationsOpt  = "blockConfirmations"
+	CommitVotesStartSeqOpt = "commitVotesStartSeq"
 )
 
 // Config encapsulates all necessary parameters in ethereum compatible forms
@@ -48,6 +49,7 @@ type Config struct {
 	http                 bool // Config for type of connection
 	startBlock           *big.Int
 	blockConfirmations   *big.Int
+	commitVotesStartSeq  *big.Int
 	commitNode           bool
 }
 
@@ -126,6 +128,17 @@ func parseChainConfig(chainCfg *core.ChainConfig) (*Config, error) {
 			delete(chainCfg.Opts, StartBlockOpt)
 		} else {
 			return nil, fmt.Errorf("unable to parse %s", StartBlockOpt)
+		}
+	}
+
+	if commitvotesStartSeq, ok := chainCfg.Opts[CommitVotesStartSeqOpt]; ok && commitvotesStartSeq != "" {
+		start := big.NewInt(0)
+		_, pass := start.SetString(commitvotesStartSeq, 10)
+		if pass {
+			config.commitVotesStartSeq = start
+			delete(chainCfg.Opts, CommitVotesStartSeqOpt)
+		} else {
+			return nil, fmt.Errorf("unable to parse %s", CommitVotesStartSeqOpt)
 		}
 	}
 

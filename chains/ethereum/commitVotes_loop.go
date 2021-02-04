@@ -26,14 +26,8 @@ import (
 )
 
 func (l *listener) commitVotes() error {
-	lastId, err := l.chainDB.GetLastBatchVotesId(uint8(l.cfg.id), l.conn.Keypair().Address())
 
-	if err != nil {
-		l.log.Warn("GetLastBatchVotesId failed", "err", err)
-		l.sysErr <- err
-	}
-
-	nextId := lastId + 1
+	nextId := l.cfg.commitVotesStartSeq.Uint64()
 
 	l.log.Info("start commitVotes...", "startWith", nextId)
 

@@ -27,11 +27,7 @@ import (
 )
 
 func (l *listener) excueteProposal() error {
-	lastId, err := l.chainDB.GetLastExecuteId(uint8(l.cfg.id), common.GenCommonAddress(l.conn.Keypair()).String())
-	if err != nil {
-		panic(err)
-	}
-	nextId := lastId + 1
+	nextId := l.cfg.ExecuteProposalStartSeq.Uint64()
 	l.log.Info("start excueteProposal...", "startWith", nextId)
 
 	for {

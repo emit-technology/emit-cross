@@ -35,8 +35,8 @@ import (
 	tron "github.com/fbsobreira/gotron-sdk/pkg/proto/core"
 )
 
-var BlockRetryInterval = time.Second * 3
-var WatchDuration = time.Minute * 30
+var BlockRetryInterval = time.Second * 10
+var WatchDuration = 60 * 30 // 30 Minute
 
 type listener struct {
 	cfg                Config
@@ -84,7 +84,7 @@ func (l *listener) start() error {
 
 	if l.cfg.commitNode {
 		go func() {
-			err := l.commitVotes()
+			err := l.commitVotes_loop()
 			if err != nil {
 				l.log.Error("start  commitVotes failed", "err", err)
 			}

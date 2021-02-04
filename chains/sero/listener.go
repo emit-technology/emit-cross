@@ -36,7 +36,7 @@ import (
 )
 
 var BlockRetryInterval = time.Second * 10
-var WatchDuration = 30 * time.Minute
+var WatchDuration = 60 * 30 // 30 Minute
 
 type listener struct {
 	cfg                Config

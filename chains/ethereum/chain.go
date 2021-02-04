@@ -76,7 +76,7 @@ func InitializeChain(chainCfg *core.ChainConfig, chainDB *chains.ChainDB, logger
 	}
 	kp, _ := kpI.(*secp256k1.Keypair)
 
-	err = setupStartBlock(cfg, chainDB, kp)
+	err = setupStart(cfg, chainDB, kp)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -135,7 +135,7 @@ func InitializeChain(chainCfg *core.ChainConfig, chainDB *chains.ChainDB, logger
 	}, writer, nil
 }
 
-func setupStartBlock(cfg *Config, chainDB *chains.ChainDB, kp *secp256k1.Keypair) error {
+func setupStart(cfg *Config, chainDB *chains.ChainDB, kp *secp256k1.Keypair) error {
 
 	if !cfg.freshStart {
 		next, err := chainDB.GetNextPollBlockNum(uint8(cfg.id), kp.Address())
@@ -146,6 +146,16 @@ func setupStartBlock(cfg *Config, chainDB *chains.ChainDB, kp *secp256k1.Keypair
 		if new(big.Int).SetUint64(next).Cmp(cfg.startBlock) == 1 {
 			cfg.startBlock = new(big.Int).SetUint64(next)
 		}
+
+		lastId, err := chainDB.GetLastBatchVotesId(uint8(cfg.id), kp.Address())
+		if err != nil {
+			return err
+		}
+
+		if new(big.Int).SetUint64(lastId+1).Cmp(cfg.commitVotesStartSeq) == 1 {
+			cfg.commitVotesStartSeq = new(big.Int).SetUint64(lastId + 1)
+		}
+
 	}
 	return nil
 }

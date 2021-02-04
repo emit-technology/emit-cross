@@ -32,16 +32,19 @@ const DefaultBlockConfirmations = 12
 
 // Chain specific options
 var (
-	AccountEndpointOpt    = "accountEndpoint"
-	BridgeOpt             = "bridge"
-	src20HandlerOpt       = "src20Handler"
-	commitNodeOpt         = "commitNode"
-	MaxGasPriceOpt        = "maxGasPrice"
-	GasLimitOpt           = "gasLimit"
-	HttpOpt               = "http"
-	StartBlockOpt         = "startBlock"
-	BlockConfirmationsOpt = "blockConfirmations"
-	signatureColletorOpt  = "signatureColletor"
+	AccountEndpointOpt         = "accountEndpoint"
+	BridgeOpt                  = "bridge"
+	src20HandlerOpt            = "src20Handler"
+	commitNodeOpt              = "commitNode"
+	MaxGasPriceOpt             = "maxGasPrice"
+	GasLimitOpt                = "gasLimit"
+	HttpOpt                    = "http"
+	StartBlockOpt              = "startBlock"
+	BlockConfirmationsOpt      = "blockConfirmations"
+	signatureColletorOpt       = "signatureColletor"
+	SignMsgStartSeqOpt         = "signMsgStartSeq"
+	VoteProposalStartSeqOpt    = "voteProposalStartSeq"
+	ExecuteProposalStartSeqOpt = "executeProposalStartSeqOpt"
 )
 
 // Config encapsulates all necessary parameters in ethereum compatible forms
@@ -63,6 +66,9 @@ type Config struct {
 	startBlock               *big.Int
 	blockConfirmations       *big.Int
 	commitNode               bool
+	SignMsgStartSeq          *big.Int
+	VoteProposalStartSeq     *big.Int
+	ExecuteProposalStartSeq  *big.Int
 }
 
 // parseChainConfig uses a core.ChainConfig to construct a corresponding Config
@@ -153,6 +159,39 @@ func parseChainConfig(chainCfg *core.ChainConfig) (*Config, error) {
 			delete(chainCfg.Opts, StartBlockOpt)
 		} else {
 			return nil, fmt.Errorf("unable to parse %s", StartBlockOpt)
+		}
+	}
+
+	if signMsgStartSeq, ok := chainCfg.Opts[SignMsgStartSeqOpt]; ok && signMsgStartSeq != "" {
+		seq := big.NewInt(0)
+		_, pass := seq.SetString(signMsgStartSeq, 10)
+		if pass {
+			config.SignMsgStartSeq = seq
+			delete(chainCfg.Opts, SignMsgStartSeqOpt)
+		} else {
+			return nil, fmt.Errorf("unable to parse %s", SignMsgStartSeqOpt)
+		}
+	}
+
+	if voteProposalStartSeq, ok := chainCfg.Opts[VoteProposalStartSeqOpt]; ok && voteProposalStartSeq != "" {
+		seq := big.NewInt(0)
+		_, pass := seq.SetString(voteProposalStartSeq, 10)
+		if pass {
+			config.VoteProposalStartSeq = seq
+			delete(chainCfg.Opts, VoteProposalStartSeqOpt)
+		} else {
+			return nil, fmt.Errorf("unable to parse %s", VoteProposalStartSeqOpt)
+		}
+	}
+
+	if executeProposalStartSeq, ok := chainCfg.Opts[ExecuteProposalStartSeqOpt]; ok && executeProposalStartSeq != "" {
+		seq := big.NewInt(0)
+		_, pass := seq.SetString(executeProposalStartSeq, 10)
+		if pass {
+			config.ExecuteProposalStartSeq = seq
+			delete(chainCfg.Opts, ExecuteProposalStartSeqOpt)
+		} else {
+			return nil, fmt.Errorf("unable to parse %s", ExecuteProposalStartSeqOpt)
 		}
 	}
 

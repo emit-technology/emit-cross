@@ -27,11 +27,7 @@ import (
 )
 
 func (l *listener) voteProposal() error {
-	lastId, err := l.chainDB.GetLastVoteId(uint8(l.cfg.id), common.GenCommonAddress(l.conn.Keypair()).String())
-	if err != nil {
-		panic(err)
-	}
-	nextId := lastId + 1
+	nextId := l.cfg.VoteProposalStartSeq.Uint64()
 	l.log.Info("start voteProposal...", "startWith", nextId)
 
 	for {

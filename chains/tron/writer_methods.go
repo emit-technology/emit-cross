@@ -175,11 +175,6 @@ func (w *writer) commitVotes(m types.BatchVotes) (*api.TransactionExtention, err
 	for _, s := range m.Signatures {
 		signatureStrs = append(signatureStrs, hexutil.Encode(s)[2:])
 	}
-	//signtureJson, err := json.Marshal(signatureStrs)
-	//if err != nil {
-	//	w.log.Error("Failed to Marshal signatureStrs", "err", err)
-	//	return nil, err
-	//}
 
 	params := []abi.Param{
 		{"uint8": strconv.FormatUint(uint64(m.SourceId), 10)},
@@ -193,7 +188,7 @@ func (w *writer) commitVotes(m types.BatchVotes) (*api.TransactionExtention, err
 	paramsJson, err := json.Marshal(params)
 
 	if err != nil {
-		w.log.Error("Failed to Marshal params", "err", err)
+		w.log.Error("commitVotes Failed to Marshal params", "err", err)
 		return nil, err
 	}
 
@@ -209,18 +204,15 @@ func (w *writer) commitVotes(m types.BatchVotes) (*api.TransactionExtention, err
 		m.Amount,
 		m.Signatures)
 
-	//tx, err := w.conn.Client().TriggerContract(address.PubkeyToAddress(w.conn.Keypair().GetPublicKey()).String(),
-	//	w.cfg.bridgeContract, "commitVotes(uint8,uint64,bytes32,address,uint256,bytes[])", string(paramsJson), 100000000, 0, "", 0)
 	if err != nil {
 		w.log.Warn("TriggerContract commitVotes ", "src", m.SourceId, "dest", m.DestinationId, "depositNonce", m.DepositNonce, "err", err)
 		return nil, err
-
 	}
 
 	signedTx, err := w.signTx(tx.Transaction)
 
 	if err != nil {
-		w.log.Warn("sign commitVotes tx err", "tx", hexutil.Encode(tx.GetTxid()), "src", m.SourceId, "dest", m.DestinationId, "depositNonce", m.DepositNonce, "err", err)
+		w.log.Warn("commitVotes sign tx err", "tx", hexutil.Encode(tx.GetTxid()), "src", m.SourceId, "dest", m.DestinationId, "depositNonce", m.DepositNonce, "err", err)
 		return nil, err
 	}
 
@@ -229,7 +221,7 @@ func (w *writer) commitVotes(m types.BatchVotes) (*api.TransactionExtention, err
 
 		if ret.Message == nil {
 			w.log.Info("commitVotes", "tx", hexutil.Encode(tx.GetTxid()), "src", m.SourceId, "dst", m.DestinationId, "nonce", m.DepositNonce,
-				"recipient", hexutil.Encode(m.Recipient),
+				"recipient", tronCommon.EncodeCheck(m.Recipient),
 				"amount", m.Amount.String())
 			return tx, nil
 		} else {

@@ -41,3 +41,5 @@ vendor
 eth-solidity/build
 eth-solidity/node_modules
 /cfgBuilder/*.toml
+scripts/configs/config-local.json
+scripts/configs/config-dev.json
