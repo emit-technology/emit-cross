@@ -21,9 +21,19 @@ import (
 )
 
 type ProposalState interface {
-	GetDepositRecord(nonce uint64, dest uint8) (resourceID [32]byte, destinationRecipientAddress []byte, amount *big.Int, err error)
-	PropsalDataHash(recipient []byte, amount *big.Int) [32]byte
-	GetProposalStatus(source uint8, nonce uint64, dataHash [32]byte) (uint8, error)
+	GetDepositFTRecord(nonce uint64, dest uint8) (resourceID [32]byte, destinationRecipientAddress []byte, amount *big.Int, err error)
+	GetDepositNFTRecord(nonce uint64, dest uint8) (src721ResourceID [32]byte,
+		destinationRecipientAddress []byte,
+		tokenId *big.Int,
+		metadata []byte,
+		src20Amount *big.Int,
+		err error)
+	FTPropsalDataHash(recipient []byte, amount *big.Int) [32]byte
+	NFTPropsalDataHash(recipient []byte, tokenId *big.Int, metadata []byte, feeAmount *big.Int) [32]byte
+	GetFTProposalStatus(source uint8, nonce uint64, dataHash [32]byte) (uint8, error)
+	GetNFTProposalStatus(source uint8, nonce uint64, dataHash [32]byte) (uint8, error)
+
 	GetBridgeAddress() []byte
+	GetNFTBridgeAddress() []byte
 	IsWithCollector() bool
 }

@@ -256,17 +256,17 @@ func (c *ChainDB) GetLastBatchVotesId(chainId uint8, account string) (uint64, er
 	return new(big.Int).SetBytes(v).Uint64(), nil
 }
 
-func (c *ChainDB) AddProposalMsg(transfer types.FTTransfer) error {
+func (c *ChainDB) AddProposalMsg(transfer types.TransferMsg) error {
 	_, err := c.Msg.EnqueueObjectAsJSON([]byte(fmt.Sprintf(DESTINATION_PROPOSAL_MSG, transfer.DestinationId)), transfer)
 	return err
 }
 
-func (c *ChainDB) GetProposalMsgById(chainId uint8, id uint64) (*types.FTTransfer, error) {
+func (c *ChainDB) GetProposalMsgById(chainId uint8, id uint64) (*types.TransferMsg, error) {
 	item, err := c.Msg.PeekByID([]byte(fmt.Sprintf(DESTINATION_PROPOSAL_MSG, chainId)), id)
 	if err != nil {
 		return nil, err
 	}
-	var result types.FTTransfer
+	var result types.TransferMsg
 	err = json.Unmarshal(item.Value, &result)
 	if err != nil {
 		return nil, err
@@ -275,17 +275,17 @@ func (c *ChainDB) GetProposalMsgById(chainId uint8, id uint64) (*types.FTTransfe
 
 }
 
-func (c *ChainDB) AddSignReq(transfer types.FTTransfer) error {
+func (c *ChainDB) AddSignReq(transfer types.TransferMsg) error {
 	_, err := c.Msg.EnqueueObjectAsJSON([]byte(fmt.Sprintf(COLLECTOR_SIGN_REQ, c.CollectorChainId)), transfer)
 	return err
 }
 
-func (c *ChainDB) GetSignReqById(id uint64) (*types.FTTransfer, error) {
+func (c *ChainDB) GetSignReqById(id uint64) (*types.TransferMsg, error) {
 	item, err := c.Msg.PeekByID([]byte(fmt.Sprintf(COLLECTOR_SIGN_REQ, c.CollectorChainId)), id)
 	if err != nil {
 		return nil, err
 	}
-	var result types.FTTransfer
+	var result types.TransferMsg
 	err = json.Unmarshal(item.Value, &result)
 	if err != nil {
 		return nil, err
@@ -294,17 +294,17 @@ func (c *ChainDB) GetSignReqById(id uint64) (*types.FTTransfer, error) {
 
 }
 
-func (c *ChainDB) AddExecuteMsg(transfer types.FTTransfer) error {
+func (c *ChainDB) AddExecuteMsg(transfer types.TransferMsg) error {
 	_, err := c.Msg.EnqueueObjectAsJSON([]byte(fmt.Sprintf(DESTINATION_EXECUTE_MSG, transfer.DestinationId)), transfer)
 	return err
 }
 
-func (c *ChainDB) GetExecuteMsgById(chainId uint8, id uint64) (*types.FTTransfer, error) {
+func (c *ChainDB) GetExecuteMsgById(chainId uint8, id uint64) (*types.TransferMsg, error) {
 	item, err := c.Msg.PeekByID([]byte(fmt.Sprintf(DESTINATION_EXECUTE_MSG, chainId)), id)
 	if err != nil {
 		return nil, err
 	}
-	var result types.FTTransfer
+	var result types.TransferMsg
 	err = json.Unmarshal(item.Value, &result)
 	if err != nil {
 		return nil, err
@@ -313,17 +313,17 @@ func (c *ChainDB) GetExecuteMsgById(chainId uint8, id uint64) (*types.FTTransfer
 
 }
 
-func (c *ChainDB) AddBatchVotesMsg(votes types.BatchVotes) error {
+func (c *ChainDB) AddBatchVotesMsg(votes types.ProposalSignatures) error {
 	_, err := c.Msg.EnqueueObjectAsJSON([]byte(fmt.Sprintf(DESTINATION_BATCH_VOTES_MSG, votes.DestinationId)), votes)
 	return err
 }
 
-func (c *ChainDB) GetBatchVotesById(chainId uint8, id uint64) (*types.BatchVotes, error) {
+func (c *ChainDB) GetBatchVotesById(chainId uint8, id uint64) (*types.ProposalSignatures, error) {
 	item, err := c.Msg.PeekByID([]byte(fmt.Sprintf(DESTINATION_BATCH_VOTES_MSG, chainId)), id)
 	if err != nil {
 		return nil, err
 	}
-	var result types.BatchVotes
+	var result types.ProposalSignatures
 	err = json.Unmarshal(item.Value, &result)
 	if err != nil {
 		return nil, err

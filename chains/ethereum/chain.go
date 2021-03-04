@@ -22,6 +22,8 @@ package ethereum
 
 import (
 	"fmt"
+	"github.com/emit-technology/emit-cross/bindings/ethereum/ERC721Handler"
+	"github.com/emit-technology/emit-cross/bindings/ethereum/NFTBridge"
 	"github.com/emit-technology/emit-cross/chains"
 	"github.com/emit-technology/emit-cross/core"
 	"github.com/emit-technology/emit-cross/crypto/secp256k1"
@@ -100,6 +102,11 @@ func InitializeChain(chainCfg *core.ChainConfig, chainDB *chains.ChainDB, logger
 		return nil, nil, err
 	}
 
+	nftbridgeContract, err := NFTBridge.NewNFTBridge(cfg.nftBridgeContract, conn.Client())
+	if err != nil {
+		return nil, nil, err
+	}
+
 	chainId, err := bridgeContract.ChainID(conn.CallOpts())
 	if err != nil {
 		return nil, nil, err
@@ -110,6 +117,10 @@ func InitializeChain(chainCfg *core.ChainConfig, chainDB *chains.ChainDB, logger
 	}
 
 	erc20HandlerContract, err := erc20Handler.NewERC20Handler(cfg.erc20HandlerContract, conn.Client())
+	if err != nil {
+		return nil, nil, err
+	}
+	erc721HandlerContract, err := ERC721Handler.NewERC721Handler(cfg.erc721HandlerContract, conn.Client())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -125,7 +136,7 @@ func InitializeChain(chainCfg *core.ChainConfig, chainDB *chains.ChainDB, logger
 	listener := NewListener(conn, chainDB, cfg, logger, stop, sysErr, m)
 
 	writer := NewWriter(conn, cfg, logger, stop, sysErr, m)
-	writer.setContract(bridgeContract, erc20HandlerContract)
+	writer.setContract(bridgeContract, nftbridgeContract, erc20HandlerContract, erc721HandlerContract)
 	listener.setWriter(writer)
 	return &Chain{
 		cfg:      chainCfg,

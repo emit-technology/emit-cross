@@ -69,7 +69,7 @@ contract SeroInterface {
     * @dev the get currency from the tx params
     */
     function sero_msg_currency() internal returns (string memory) {
-        bytes memory tmp = new bytes(32);
+        bytes memory tmp = new bytes(0);
         bytes32 b32;
         assembly {
             log1(tmp, 0x20, sload(topic_sero_currency_slot))
@@ -144,7 +144,7 @@ contract SeroInterface {
      * @dev the get category from the tx params
      */
     function sero_msg_category() internal returns (string memory) {
-        bytes memory tmp = new bytes(32);
+        bytes memory tmp = new bytes(0);
         bytes32 b32;
         assembly {
             log1(tmp, 0x20, sload(topic_sero_category_slot))
@@ -157,7 +157,7 @@ contract SeroInterface {
     * @dev the get ticketId from the tx params
     */
     function sero_msg_ticket() internal returns (bytes32 value) {
-        bytes memory tmp = new bytes(32);
+        bytes memory tmp = new bytes(0);
         assembly {
             log1(tmp, 0x20, sload(topic_sero_ticket_slot))
             value := mload(tmp)

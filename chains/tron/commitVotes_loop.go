@@ -22,6 +22,7 @@ import (
 	"github.com/emit-technology/emit-cross/types"
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	tronCommon "github.com/fbsobreira/gotron-sdk/pkg/common"
+	"math/big"
 	"time"
 )
 
@@ -38,11 +39,13 @@ func (l *listener) repairCommitVotes(seqs []uint64) {
 		} else {
 			panic(err)
 		}
-		dataHash := ConstructTrc20ProposalDataHash(l.cfg.trc20HandlerContract, m.Recipient, m.Amount)
+		recipient := m.Payload[1]
+		amountOrTokenId := new(big.Int).SetBytes(m.Payload[0])
+		dataHash := ConstructTrc20ProposalDataHash(l.cfg.trc20HandlerContract, recipient, amountOrTokenId)
 		if !l.writer.proposalIsFinalized(m.SourceId, m.DepositNonce, dataHash) {
 			l.log.Info("commitVotes", "seq", seq, "src", m.SourceId, "dst", m.DestinationId, "nonce", m.DepositNonce,
-				"recipient", tronCommon.EncodeCheck(m.Recipient),
-				"amount", m.Amount.String())
+				"recipient", tronCommon.EncodeCheck(recipient),
+				"amount", amountOrTokenId.String())
 			tx, err := l.writer.commitVotes(*m)
 			if err != nil {
 				l.log.Error("Failed to executeProposal", "id", seq, "err", err)
@@ -75,11 +78,13 @@ func (l *listener) commitVotes_loop() error {
 				time.Sleep(BlockRetryInterval)
 				continue
 			}
-			dataHash := ConstructTrc20ProposalDataHash(l.cfg.trc20HandlerContract, m.Recipient, m.Amount)
+			recipient := m.Payload[1]
+			amountOrTokenId := new(big.Int).SetBytes(m.Payload[0])
+			dataHash := ConstructTrc20ProposalDataHash(l.cfg.trc20HandlerContract, recipient, amountOrTokenId)
 			if !l.writer.proposalIsFinalized(m.SourceId, m.DepositNonce, dataHash) {
 				l.log.Info("commitVotes", "seq", nextId, "src", m.SourceId, "dst", m.DestinationId, "nonce", m.DepositNonce,
-					"recipient", tronCommon.EncodeCheck(m.Recipient),
-					"amount", m.Amount.String())
+					"recipient", tronCommon.EncodeCheck(recipient),
+					"amount", amountOrTokenId.String())
 				tx, err := l.writer.commitVotes(*m)
 				if err != nil {
 					l.log.Error("Failed to executeProposal", "id", nextId, "err", err)
@@ -95,9 +100,11 @@ func (l *listener) commitVotes_loop() error {
 
 }
 
-func (l *listener) wacthCommitVotesResult(m types.BatchVotes, txId []byte) {
+func (l *listener) wacthCommitVotesResult(m types.ProposalSignatures, txId []byte) {
 	begin := time.Now().Unix()
-	dataHash := ConstructTrc20ProposalDataHash(l.cfg.trc20HandlerContract, m.Recipient, m.Amount)
+	recipient := m.Payload[1]
+	amountOrTokenId := new(big.Int).SetBytes(m.Payload[0])
+	dataHash := ConstructTrc20ProposalDataHash(l.cfg.trc20HandlerContract, recipient, amountOrTokenId)
 	for {
 		if (time.Now().Unix() - begin) > int64(WatchDuration) {
 			l.log.Info("commit votes not blocked,retry", "tx", tronCommon.ToHex(txId), "src", m.SourceId, "dst", m.DestinationId, "nonce", m.DepositNonce)
@@ -122,8 +129,15 @@ func (l *listener) wacthCommitVotesResult(m types.BatchVotes, txId []byte) {
 			l.log.Info("commit votes success", "tx", tronCommon.ToHex(txId), "src", m.SourceId, "dst", m.DestinationId, "nonce", m.DepositNonce)
 			return
 		} else {
-			l.log.Error("commit votes failed", "tx", tronCommon.ToHex(txId), "src", m.SourceId, "dst", m.DestinationId, "nonce", m.DepositNonce)
-			return
+			if receipt.Receipt.Result == 11 {
+				l.log.Info("commit votes failed retry", "tx", tronCommon.ToHex(txId), "src", m.SourceId, "dst", m.DestinationId, "nonce", m.DepositNonce)
+				l.chainDB.AddBatchVotesMsg(m)
+				return
+			} else {
+				l.log.Error("commit votes failed", "tx", tronCommon.ToHex(txId), "src", m.SourceId, "dst", m.DestinationId, "nonce", m.DepositNonce, "failed", receipt.Receipt.Result)
+				return
+			}
+
 		}
 
 	}

@@ -65,17 +65,18 @@ type Config struct {
 func parseChainConfig(chainCfg *core.ChainConfig) (*Config, error) {
 
 	config := &Config{
-		name:               chainCfg.Name,
-		id:                 chainCfg.Id,
-		endpoint:           chainCfg.Endpoint,
-		from:               chainCfg.From,
-		keystorePath:       chainCfg.KeystorePath,
-		freshStart:         chainCfg.FreshStart,
-		gasLimit:           big.NewInt(DefaultGasLimit),
-		maxGasPrice:        big.NewInt(DefaultGasPrice),
-		http:               false,
-		startBlock:         big.NewInt(0),
-		blockConfirmations: big.NewInt(0),
+		name:                chainCfg.Name,
+		id:                  chainCfg.Id,
+		endpoint:            chainCfg.Endpoint,
+		from:                chainCfg.From,
+		keystorePath:        chainCfg.KeystorePath,
+		freshStart:          chainCfg.FreshStart,
+		gasLimit:            big.NewInt(DefaultGasLimit),
+		maxGasPrice:         big.NewInt(DefaultGasPrice),
+		http:                false,
+		startBlock:          big.NewInt(0),
+		commitVotesStartSeq: big.NewInt(0),
+		blockConfirmations:  big.NewInt(0),
 	}
 
 	if contract, ok := chainCfg.Opts[BridgeOpt]; ok && contract != "" {

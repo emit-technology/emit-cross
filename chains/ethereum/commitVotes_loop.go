@@ -22,6 +22,7 @@ import (
 	"github.com/emit-technology/emit-cross/queue"
 	"github.com/emit-technology/emit-cross/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
+	"math/big"
 	"time"
 )
 
@@ -44,7 +45,7 @@ func (l *listener) commitVotes() error {
 				time.Sleep(BlockRetryInterval)
 				continue
 			}
-			if l.writer.shouldVote(*m) {
+			if l.writer.shouldCommitSignatures(*m) {
 
 				tx, err := l.writer.commitVotes(*m)
 				if err != nil {
@@ -61,9 +62,19 @@ func (l *listener) commitVotes() error {
 
 }
 
-func (l *listener) wacthCommitVotesResult(m types.BatchVotes, tx ethcommon.Hash) {
+func (l *listener) wacthCommitVotesResult(m types.ProposalSignatures, tx ethcommon.Hash) {
 	begin := time.Now().Unix()
-	dataHash := ConstructErc20ProposalDataHash(l.cfg.erc20HandlerContract, ethcommon.BytesToAddress(m.Recipient), m.Amount)
+	recipient := ethcommon.BytesToAddress(m.Payload[1])
+	amountOrTokenId := new(big.Int).SetBytes(m.Payload[0])
+	var dataHash [32]byte
+	if m.Type == types.FungibleTransfer {
+		dataHash = ConstructErc20ProposalDataHash(l.cfg.erc20HandlerContract, recipient, amountOrTokenId)
+	} else {
+		feeAmount := new(big.Int).SetBytes(m.Payload[3])
+
+		dataHash = ConstructErc721ProposalDataHash(l.cfg.erc721HandlerContract, recipient, amountOrTokenId, m.Payload[2], feeAmount)
+
+	}
 	for {
 		if (time.Now().Unix() - begin) > int64(WatchDuration) {
 			l.log.Info("commit votes not blocked,retry", "tx", tx.String(), "src", m.SourceId, "dst", m.DestinationId, "nonce", m.DepositNonce)
@@ -81,8 +92,8 @@ func (l *listener) wacthCommitVotesResult(m types.BatchVotes, tx ethcommon.Hash)
 			continue
 		}
 
-		if l.writer.proposalIsFinalized(m.SourceId, m.DepositNonce, dataHash) {
-			l.log.Info("Proposal finalized on chain", "src", m.SourceId, "dst", m.DestinationId, "nonce", m.DepositNonce)
+		if l.writer.proposalIsFinalized(m.SourceId, m.DepositNonce, m.Type, dataHash) {
+			l.log.Info("Proposal finalized on chain", "type", m.Type, "src", m.SourceId, "dst", m.DestinationId, "nonce", m.DepositNonce)
 			return
 		}
 

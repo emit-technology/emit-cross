@@ -45,7 +45,13 @@ func (l *listener) signDestProposal() error {
 				continue
 			}
 			if l.shouldSign(*m) {
-				bridge := l.state[m.DestinationId].GetBridgeAddress()
+				var bridge []byte
+				if m.Type == types.FungibleTransfer {
+					bridge = l.state[m.DestinationId].GetBridgeAddress()
+
+				} else {
+					bridge = l.state[m.DestinationId].GetNFTBridgeAddress()
+				}
 				tx, err := l.writer.signDestProposal(*m, bridge)
 				if err != nil {
 					l.log.Error("Failed to signProposal", "id", nextId, "err", err)
@@ -62,7 +68,7 @@ func (l *listener) signDestProposal() error {
 
 }
 
-func (l *listener) wacthSignProposalResult(m types.FTTransfer, tx seroCommon.Hash) {
+func (l *listener) wacthSignProposalResult(m types.TransferMsg, tx seroCommon.Hash) {
 	begin := time.Now().Unix()
 	for {
 		if (time.Now().Unix() - begin) > int64(WatchDuration) {

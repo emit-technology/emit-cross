@@ -203,7 +203,7 @@ func (l *listener) getConcernedEventsForBlock(latestBlock *big.Int) error {
 		}
 
 	}
-	voteReqMsgs := []types.FTTransfer{}
+	voteReqMsgs := []types.TransferMsg{}
 	for _, txinfo := range txinfos {
 		logs := txinfo.GetLog()
 		for _, log := range logs {

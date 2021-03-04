@@ -19,3 +19,19 @@ interface IDepositFTExecute {
 
 }
 
+
+interface IDepositNFTExecute {
+
+    function deposit(bytes32 resourceID, uint8 destinationChainID, uint64 depositNonce, address depositer, bytes calldata recipient,uint256 tokenId) external;
+
+    /**
+        @notice It is intended that proposals are executed by the Bridge contract.
+        @param resourceID resourceID
+     */
+    function executeProposal(bytes32 resourceID, address recipient,uint256 tokenId,bytes calldata metadata) external;
+
+
+}
+
+
+

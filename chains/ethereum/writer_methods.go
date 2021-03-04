@@ -5,11 +5,11 @@ package ethereum
 
 import (
 	"errors"
-	"github.com/emit-technology/emit-cross/common"
 	"github.com/emit-technology/emit-cross/types"
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/sero-cash/go-sero/common/hexutil"
+	"math/big"
 )
 
 // Number of blocks to wait for an finalization event
@@ -21,45 +21,59 @@ var ErrNonceTooLow = errors.New("nonce too low")
 var ErrTxUnderpriced = errors.New("replacement transaction underpriced")
 
 // proposalIsComplete returns true if the proposal state is either Passed, Transferred or Cancelled
-func (w *writer) proposalIsComplete(srcId types.ChainId, nonce types.Nonce, dataHash [32]byte) bool {
-	prop, err := w.bridgeContract.GetProposal(w.conn.CallOpts(), uint8(srcId), uint64(nonce), dataHash)
-	if err != nil {
-		w.log.Error("Failed to check proposal existence", "err", err)
-		return false
+func (w *writer) proposalIsComplete(srcId types.ChainId, nonce types.Nonce, typ types.TransferType, dataHash [32]byte) bool {
+	if typ == types.FungibleTransfer {
+		prop, err := w.bridgeContract.GetProposal(w.conn.CallOpts(), uint8(srcId), uint64(nonce), dataHash)
+		if err != nil {
+			w.log.Error("Failed to check proposal existence", "err", err)
+			return false
+		}
+		return prop.Status == PassedStatus || prop.Status == TransferredStatus || prop.Status == CancelledStatus
+	} else {
+		prop, err := w.nftBridgeContract.GetProposal(w.conn.CallOpts(), uint8(srcId), uint64(nonce), dataHash)
+		if err != nil {
+			w.log.Error("Failed to check proposal existence", "err", err)
+			return false
+		}
+		return prop.Status == PassedStatus || prop.Status == TransferredStatus || prop.Status == CancelledStatus
 	}
-	return prop.Status == PassedStatus || prop.Status == TransferredStatus || prop.Status == CancelledStatus
 }
 
 // proposalIsComplete returns true if the proposal state is Transferred or Cancelled
-func (w *writer) proposalIsFinalized(srcId types.ChainId, nonce types.Nonce, dataHash [32]byte) bool {
-	prop, err := w.bridgeContract.GetProposal(w.conn.CallOpts(), uint8(srcId), uint64(nonce), dataHash)
-	if err != nil {
-		w.log.Error("Failed to check proposal existence", "err", err)
-		return false
+func (w *writer) proposalIsFinalized(srcId types.ChainId, nonce types.Nonce, typ types.TransferType, dataHash [32]byte) bool {
+	if typ == types.FungibleTransfer {
+		prop, err := w.bridgeContract.GetProposal(w.conn.CallOpts(), uint8(srcId), uint64(nonce), dataHash)
+		if err != nil {
+			w.log.Error("Failed to check proposal existence", "err", err)
+			return false
+		}
+		return prop.Status == TransferredStatus || prop.Status == CancelledStatus // Transferred (3)
+	} else {
+		prop, err := w.nftBridgeContract.GetProposal(w.conn.CallOpts(), uint8(srcId), uint64(nonce), dataHash)
+		if err != nil {
+			w.log.Error("Failed to check proposal existence", "err", err)
+			return false
+		}
+		return prop.Status == TransferredStatus || prop.Status == CancelledStatus // Transferred (3)
 	}
-	return prop.Status == TransferredStatus || prop.Status == CancelledStatus // Transferred (3)
+
 }
 
-// hasVoted checks if this relayer has already voted
-func (w *writer) hasVoted(srcId types.ChainId, nonce types.Nonce, dataHash [32]byte) bool {
-	hasVoted, err := w.bridgeContract.HasVotedOnProposal(w.conn.CallOpts(), common.IDAndNonce(srcId, nonce), dataHash, w.conn.Opts().From)
-	if err != nil {
-		w.log.Error("Failed to check proposal existence", "err", err)
-		return false
+func (w *writer) shouldCommitSignatures(m types.ProposalSignatures) bool {
+	recipient := ethCommon.BytesToAddress(m.Payload[1])
+	amountOrTokenId := new(big.Int).SetBytes(m.Payload[0])
+	var dataHash [32]byte
+	if m.Type == types.FungibleTransfer {
+		dataHash = ConstructErc20ProposalDataHash(w.cfg.erc20HandlerContract, recipient, amountOrTokenId)
+	} else {
+		feeAmount := new(big.Int).SetBytes(m.Payload[3])
+
+		dataHash = ConstructErc721ProposalDataHash(w.cfg.erc721HandlerContract, recipient, amountOrTokenId, m.Payload[2], feeAmount)
+
 	}
 
-	return hasVoted
-}
-
-func (w *writer) shouldVote(m types.BatchVotes) bool {
-	dataHash := ConstructErc20ProposalDataHash(w.cfg.erc20HandlerContract, ethCommon.BytesToAddress(m.Recipient), m.Amount)
-	if w.proposalIsComplete(m.SourceId, m.DepositNonce, dataHash) {
-		w.log.Info("Proposal complete, not voting", "src", m.SourceId, "nonce", m.DepositNonce)
-		return false
-	}
-	// Check if relayer has previously voted
-	if w.hasVoted(m.SourceId, m.DepositNonce, dataHash) {
-		w.log.Info("Relayer has already voted, not voting", "src", m.SourceId, "nonce", m.DepositNonce)
+	if w.proposalIsComplete(m.SourceId, m.DepositNonce, m.Type, dataHash) {
+		w.log.Info("Proposal has completed", "type", m.Type, "src", m.SourceId, "dst", m.DestinationId, "nonce", m.DepositNonce)
 		return false
 	}
 
@@ -68,30 +82,82 @@ func (w *writer) shouldVote(m types.BatchVotes) bool {
 
 // commitVotes submits all votes  for a  proposal
 // a commit will try to be submitted up to the TxRetryLimit times
-func (w *writer) commitVotes(m types.BatchVotes) (*ethTypes.Transaction, error) {
+func (w *writer) commitVotes(m types.ProposalSignatures) (*ethTypes.Transaction, error) {
 	err := w.conn.LockAndUpdateOpts()
 	if err != nil {
 		w.log.Error("Failed to update tx opts", "err", err)
 		return nil, err
 	}
-	tx, err := w.bridgeContract.CommitVotes(
-		w.conn.Opts(),
-		uint8(m.SourceId),
-		uint64(m.DepositNonce),
-		m.ResourceId,
-		ethCommon.BytesToAddress(m.Recipient),
-		m.Amount,
-		m.Signatures,
-	)
+	recipient := ethCommon.BytesToAddress(m.Payload[1])
+	amountOrTokenId := new(big.Int).SetBytes(m.Payload[0])
+	feeAmount := new(big.Int)
+	var tx *ethTypes.Transaction
+	if m.Type == types.FungibleTransfer {
+		tx, err = w.bridgeContract.CommitVotes(
+			w.conn.Opts(),
+			uint8(m.SourceId),
+			uint64(m.DepositNonce),
+			m.ResourceId,
+			recipient,
+			amountOrTokenId,
+			m.Signatures,
+		)
+	} else {
+		feeAmount = new(big.Int).SetBytes(m.Payload[3])
+		var data []byte
+		data = append(data, ethCommon.LeftPadBytes(recipient[:], 32)...)
+		data = append(data, ethCommon.LeftPadBytes(amountOrTokenId.Bytes(), 32)...)
+		data = append(data, ethCommon.LeftPadBytes(big.NewInt(128).Bytes(), 32)...)
+		data = append(data, ethCommon.LeftPadBytes(m.Payload[3], 32)...)
+		metadata := m.Payload[2]
+		len := len(metadata)
+		data = append(data, ethCommon.LeftPadBytes(new(big.Int).SetInt64(int64(len)).Bytes(), 32)...)
+		if len > 32 {
+			n := len / 32
+			data = append(data, metadata[:n*32]...)
+			d := len % 32
+			if d > 0 {
+				data = append(data, ethCommon.RightPadBytes(metadata[n*32:], 32)...)
+
+			}
+
+		} else {
+			data = append(data, ethCommon.RightPadBytes(metadata, 32)...)
+
+		}
+
+		w.log.Info("votes param", "data", hexutil.Encode(data[:]))
+
+		tx, err = w.nftBridgeContract.CommitVotes(
+			w.conn.Opts(),
+			uint8(m.SourceId),
+			uint64(m.DepositNonce),
+			m.ResourceId,
+			data,
+			m.Signatures,
+		)
+	}
+
 	w.conn.UnlockOpts()
 
 	if err == nil {
-		w.log.Info("commit erc20 proposal vote signatures",
-			"tx", tx.Hash(),
-			"src", m.SourceId,
-			"depositNonce", m.DepositNonce,
-			"recipient", hexutil.Encode(m.Recipient),
-			"amount", m.Amount.String())
+		if m.Type == types.FungibleTransfer {
+			w.log.Info("commit erc20 proposal vote signatures",
+				"tx", tx.Hash(),
+				"src", m.SourceId,
+				"depositNonce", m.DepositNonce,
+				"recipient", recipient,
+				"amount", amountOrTokenId.String())
+		} else {
+			w.log.Info("commit erc721 proposal vote signatures",
+				"tx", tx.Hash(),
+				"src", m.SourceId,
+				"depositNonce", m.DepositNonce,
+				"recipient", recipient,
+				"tokenId", amountOrTokenId.String(),
+				"feeAmount", feeAmount.String())
+		}
+
 		if w.metrics != nil {
 			w.metrics.VotesSubmitted.Inc()
 		}

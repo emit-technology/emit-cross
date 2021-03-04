@@ -25,3 +25,7 @@ package sero
 // ./abigen --abi Collector/SignatureCollector.abi --pkg Collector --type SignatureCollector --bin Collector/SignatureCollector.bin --out Collector/SignatureCollector.go
 
 // ./abigen --abi BridgeCounter/BridgeCounter.abi --pkg BridgeCounter --type BridgeCounter --bin BridgeCounter/BridgeCounter.bin --out BridgeCounter/BridgeCounter.go
+
+// ./abigen --abi NFTBridge/NFTBridge.abi --pkg NFTBridge --type NFTBridge --bin NFTBridge/NFTBridge.bin --out NFTBridge/NFTBridge.go
+
+// ./abigen --abi SRC721Handler/SRC721Handler.abi --pkg SRC721Handler --type SRC721Handler --bin SRC721Handler/SRC721Handler.bin --out SRC721Handler/SRC721Handler.go

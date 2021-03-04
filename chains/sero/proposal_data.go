@@ -22,14 +22,25 @@ import (
 	"math/big"
 )
 
-func ConstructSrc20ProposalDataHash(handler seroCommon.Address, recipient seroCommon.Address, amount *big.Int) [32]byte {
+func ConstructSRC20ProposalDataHash(handler seroCommon.Address, recipient seroCommon.Address, amount *big.Int) [32]byte {
 	var data []byte
 	handlerContractAddr := common.GenContractAddress(handler)
 	recipientAddr := common.GenContractAddress(recipient)
 	data = append(data, seroCommon.LeftPadBytes(handlerContractAddr[:], 20)...)
 	data = append(data, seroCommon.LeftPadBytes(recipientAddr[:], 20)...)
 	data = append(data, seroCommon.LeftPadBytes(amount.Bytes(), 32)...)
+	return common.Hash(data)
 
+}
+
+func ConstructSRC721ProposalDataHash(handler seroCommon.Address, recipient seroCommon.Address, tokenId *big.Int, metadata []byte) [32]byte {
+	var data []byte
+	handlerContractAddr := common.GenContractAddress(handler)
+	recipientAddr := common.GenContractAddress(recipient)
+	data = append(data, seroCommon.LeftPadBytes(handlerContractAddr[:], 20)...)
+	data = append(data, seroCommon.LeftPadBytes(recipientAddr[:], 20)...)
+	data = append(data, seroCommon.LeftPadBytes(tokenId.Bytes(), 32)...)
+	data = append(data, metadata...)
 	return common.Hash(data)
 
 }

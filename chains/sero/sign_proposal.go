@@ -27,7 +27,7 @@ import (
 	"math/big"
 )
 
-func (w *writer) signDestProposal(m types.FTTransfer, bridge []byte) (*seroTypes.Transaction, error) {
+func (w *writer) signDestProposal(m types.TransferMsg, bridge []byte) (*seroTypes.Transaction, error) {
 	w.log.Info("Ralayer sign dest proposal", "source", m.SourceId, "dest", m.DestinationId, "nonce", m.DepositNonce)
 	var data []byte
 	var bridgeAddress [20]byte
@@ -48,24 +48,36 @@ func (w *writer) signDestProposal(m types.FTTransfer, bridge []byte) (*seroTypes
 	data = append(data, seroCommon.LeftPadBytes(new(big.Int).SetUint64(uint64(m.DepositNonce)).Bytes(), 8)...)
 	data = append(data, m.ResourceId[:]...)
 	var recipientAddr [20]byte
+
+	recipient := m.Payload[1]
+
 	//var receiptAddr := m.Recipient
-	if len(m.Recipient) == 96 {
-		short := common.GenContractAddress(seroCommon.BytesToAddress(m.Recipient[:]))
+	if len(recipient) == 96 {
+		short := common.GenContractAddress(seroCommon.BytesToAddress(recipient[:]))
 		copy(recipientAddr[:], short[:])
-	} else if len(m.Recipient) == 21 {
-		copy(recipientAddr[:], m.Recipient[1:])
+	} else if len(recipient) == 21 {
+		copy(recipientAddr[:], recipient[1:])
 
 	} else {
-		copy(recipientAddr[:], m.Recipient)
+		copy(recipientAddr[:], recipient)
 	}
 
 	data = append(data, recipientAddr[:]...)
-	data = append(data, seroCommon.LeftPadBytes(m.Amount.Bytes(), 32)...)
+	data = append(data, seroCommon.LeftPadBytes(m.Payload[0], 32)...)
+	if m.Type == types.NonFungibleTransfer {
+		w.log.Info("matadata", "data", hexutil.Encode(m.Payload[2]))
+		metadata := m.Payload[2]
+		data = append(data, metadata...)
+		data = append(data, seroCommon.LeftPadBytes(m.Payload[3], 32)...)
+
+	}
 
 	dataHash := common.Hash(data)
-	w.log.Info("dataHash", "hash", hexutil.Encode(dataHash[:]))
+	w.log.Info("dataHash", "data", hexutil.Encode(data[:]), "hash", hexutil.Encode(dataHash[:]))
 
 	sig, err := ethCrypto.Sign(dataHash[:], w.conn.Keypair().PrivateKey())
+
+	w.log.Info("signature", "sin", hexutil.Encode(sig[:]))
 
 	if err != nil {
 		w.log.Error("ethCrypto.Sign failed", "err", err)
@@ -78,13 +90,28 @@ func (w *writer) signDestProposal(m types.FTTransfer, bridge []byte) (*seroTypes
 
 // commitErc20ProposalSignature submits a proposal with signature
 // a  proposal signature will try to be submitted up to the TxRetryLimit times
-func (w *writer) commitProposalSignature(m types.FTTransfer, sign []byte) (*seroTypes.Transaction, error) {
-	w.log.Info("commitErc20ProposalSignature",
-		"src", m.SourceId,
-		"dest", m.DestinationId,
-		"depositNonce", m.DepositNonce, "resourceId", hexutil.Encode(m.ResourceId[:]),
-		"reciepient", hexutil.Encode(m.Recipient), "amount", m.Amount.String(),
-		"sign", hexutil.Encode(sign))
+func (w *writer) commitProposalSignature(m types.TransferMsg, sign []byte) (*seroTypes.Transaction, error) {
+	recipient := m.Payload[1]
+	amountOrTokenId := new(big.Int).SetBytes(m.Payload[0])
+	transferType := uint8(1)
+
+	if m.Type == types.FungibleTransfer {
+		w.log.Info("commitFungibleProposalSignature",
+			"src", m.SourceId,
+			"dest", m.DestinationId,
+			"depositNonce", m.DepositNonce, "resourceId", hexutil.Encode(m.ResourceId[:]),
+			"reciepient", hexutil.Encode(recipient), "amount", amountOrTokenId.String(),
+			"sign", hexutil.Encode(sign))
+	} else {
+		transferType = uint8(2)
+		w.log.Info("commitNonFungibleProposalSignature",
+			"src", m.SourceId,
+			"dest", m.DestinationId,
+			"depositNonce", m.DepositNonce, "resourceId", hexutil.Encode(m.ResourceId[:]),
+			"reciepient", hexutil.Encode(recipient), "tokenId", amountOrTokenId.String(),
+			"metaData", string(m.Payload[2]),
+			"sign", hexutil.Encode(sign))
+	}
 
 	err := w.conn.LockAndUpdateOpts()
 	if err != nil {
@@ -97,6 +124,7 @@ func (w *writer) commitProposalSignature(m types.FTTransfer, sign []byte) (*sero
 		uint8(m.SourceId),
 		uint8(m.DestinationId),
 		uint64(m.DepositNonce),
+		transferType,
 		sign,
 	)
 	w.conn.UnlockOpts()
@@ -105,8 +133,7 @@ func (w *writer) commitProposalSignature(m types.FTTransfer, sign []byte) (*sero
 		w.log.Info("Submitted proposal sign", "tx", tx.Hash(),
 			"src", m.SourceId,
 			"dest", m.DestinationId,
-			"depositNonce", m.DepositNonce, "resourceId", hexutil.Encode(m.ResourceId[:]),
-			"reciepient", hexutil.Encode(m.Recipient), "amount", m.Amount.String())
+			"depositNonce", m.DepositNonce, "resourceId", hexutil.Encode(m.ResourceId[:]))
 		return tx, nil
 	} else {
 		w.log.Warn("commit proposal sign failed", "dest", m.DestinationId,

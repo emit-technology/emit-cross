@@ -21,7 +21,7 @@ import (
 
 var BlockRetryInterval = time.Second * 10
 
-var WatchDuration = 60 * 90 // 90 Minute
+var WatchDuration = 60 * 60 * 10 // 10 hours
 
 type listener struct {
 	cfg                Config
@@ -147,23 +147,29 @@ func (l *listener) pollBlocks() error {
 
 // getDepositEventsForBlock looks for the deposit event in the latest block
 func (l *listener) getDepositEventsForBlock(latestBlock *big.Int) error {
-	l.log.Debug("Querying block for deposit events", "block", latestBlock)
-	query := buildQuery(l.cfg.bridgeContract, utils.Deposit, latestBlock, latestBlock)
 
+	//l.log.Info("Querying block for deposit events", "block", latestBlock)
+	query := buildQuery([]ethcommon.Address{l.cfg.bridgeContract, l.cfg.nftBridgeContract},
+		latestBlock, latestBlock, utils.Deposit)
 	// querying for logs
 	logs, err := l.conn.Client().FilterLogs(context.Background(), query)
 	if err != nil {
 		return fmt.Errorf("unable to Filter Logs: %w", err)
 	}
 
-	ms := []types.FTTransfer{}
+	ms := []types.TransferMsg{}
 	// read through the log events and handle their deposit event if Handler is recognized
 	for _, log := range logs {
 		destId := types.ChainId(log.Topics[1].Big().Uint64())
 		//rId := msg.ResourceIdFromSlice(log.Topics[2].Bytes())
 		nonce := types.Nonce(log.Topics[3].Big().Uint64())
-
-		m, err := l.handleErc20DepositedEvent(latestBlock.Uint64(), destId, nonce)
+		var m types.TransferMsg
+		var err error
+		if log.Address == l.cfg.bridgeContract {
+			m, err = l.handleErc20DepositedEvent(latestBlock.Uint64(), destId, nonce)
+		} else {
+			m, err = l.handleErc721DepositedEvent(latestBlock.Uint64(), destId, nonce)
+		}
 
 		if err != nil {
 			return err
@@ -188,7 +194,6 @@ func (l *listener) getDepositEventsForBlock(latestBlock *big.Int) error {
 					return err
 				}
 			}
-
 		}
 
 	}
@@ -196,14 +201,31 @@ func (l *listener) getDepositEventsForBlock(latestBlock *big.Int) error {
 	return nil
 }
 
-// buildQuery constructs a query for the bridgeContract by hashing sig to get the event topic
-func buildQuery(contract ethcommon.Address, sig utils.EventSig, startBlock *big.Int, endBlock *big.Int) eth.FilterQuery {
+//
+//// buildQuery constructs a query for the bridgeContract by hashing sig to get the event topic
+//func buildQuery(contract ethcommon.Address, sig utils.EventSig, startBlock *big.Int, endBlock *big.Int) eth.FilterQuery {
+//	query := eth.FilterQuery{
+//		FromBlock: startBlock,
+//		ToBlock:   endBlock,
+//		Addresses: []ethcommon.Address{contract},
+//		Topics: [][]ethcommon.Hash{
+//			{sig.GetTopic()},
+//		},
+//	}
+//	return query
+//}
+
+func buildQuery(contracts []ethcommon.Address, startBlock *big.Int, endBlock *big.Int, sigs ...utils.EventSig) eth.FilterQuery {
+	topics := []ethcommon.Hash{}
+	for _, sig := range sigs {
+		topics = append(topics, sig.GetTopic())
+	}
 	query := eth.FilterQuery{
 		FromBlock: startBlock,
 		ToBlock:   endBlock,
-		Addresses: []ethcommon.Address{contract},
+		Addresses: contracts,
 		Topics: [][]ethcommon.Hash{
-			{sig.GetTopic()},
+			topics,
 		},
 	}
 	return query

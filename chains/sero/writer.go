@@ -19,7 +19,9 @@ package sero
 import (
 	"github.com/emit-technology/emit-cross/bindings/sero/Bridge"
 	"github.com/emit-technology/emit-cross/bindings/sero/Collector"
+	"github.com/emit-technology/emit-cross/bindings/sero/NFTBridge"
 	src20Handler "github.com/emit-technology/emit-cross/bindings/sero/SRC20Handler"
+	"github.com/emit-technology/emit-cross/bindings/sero/SRC721Handler"
 	log "github.com/emit-technology/emit-cross/log"
 	metrics "github.com/emit-technology/emit-cross/metrics/types"
 )
@@ -29,10 +31,13 @@ var TransferredStatus uint8 = 3
 var CancelledStatus uint8 = 4
 
 type writer struct {
-	cfg                        Config
-	conn                       Connection
-	bridgeContract             *Bridge.Bridge // instance of bound receiver bridgeContract
+	cfg               Config
+	conn              Connection
+	bridgeContract    *Bridge.Bridge       // instance of bound receiver bridgeContract
+	nftBridgeContract *NFTBridge.NFTBridge // instance of bound receiver bridgeContract
+
 	src20HandlerContract       *src20Handler.SRC20Handler
+	src721HandlerContract      *SRC721Handler.SRC721Handler
 	signatureCollectorContract *Collector.SignatureCollector
 	log                        log.Logger
 	stop                       <-chan int
@@ -53,8 +58,14 @@ func NewWriter(conn Connection, cfg *Config, log log.Logger, stop <-chan int, sy
 }
 
 // setContract adds the bound receiver bridgeContract to the writer
-func (w *writer) setContract(bridge *Bridge.Bridge, handler *src20Handler.SRC20Handler, collector *Collector.SignatureCollector) {
+func (w *writer) setContract(bridge *Bridge.Bridge,
+	nftBridge *NFTBridge.NFTBridge,
+	src20Handler *src20Handler.SRC20Handler,
+	src721Handler *SRC721Handler.SRC721Handler,
+	collector *Collector.SignatureCollector) {
 	w.bridgeContract = bridge
-	w.src20HandlerContract = handler
+	w.nftBridgeContract = nftBridge
+	w.src20HandlerContract = src20Handler
+	w.src721HandlerContract = src721Handler
 	w.signatureCollectorContract = collector
 }

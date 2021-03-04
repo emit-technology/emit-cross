@@ -61,7 +61,7 @@ func (l *listener) voteProposal() error {
 
 }
 
-func (l *listener) wacthVoteProposalResult(m types.FTTransfer, tx seroCommon.Hash) {
+func (l *listener) wacthVoteProposalResult(m types.TransferMsg, tx seroCommon.Hash) {
 	begin := time.Now().Unix()
 	for {
 		if (time.Now().Unix() - begin) > int64(WatchDuration) {
@@ -81,10 +81,10 @@ func (l *listener) wacthVoteProposalResult(m types.FTTransfer, tx seroCommon.Has
 		}
 
 		if receipt.Status == 1 {
-			l.log.Info("commit votes success blocked", "tx", tx.String(), "src", m.SourceId, "dst", m.DestinationId, "nonce", m.DepositNonce)
+			l.log.Info("vote proposal success blocked", "tx", tx.String(), "src", m.SourceId, "dst", m.DestinationId, "nonce", m.DepositNonce)
 			return
 		} else {
-			l.log.Error("commit votes failed blocked", "tx", tx.String(), "src", m.SourceId, "dst", m.DestinationId, "nonce", m.DepositNonce)
+			l.log.Error("vote proposal failed blocked", "tx", tx.String(), "src", m.SourceId, "dst", m.DestinationId, "nonce", m.DepositNonce)
 			return
 		}
 

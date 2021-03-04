@@ -33,6 +33,12 @@
 			},
 			{
 				"indexed": false,
+				"internalType": "enum SignatureCollector.TransferType",
+				"name": "typ",
+				"type": "uint8"
+			},
+			{
+				"indexed": false,
 				"internalType": "enum SignatureCollector.ProposalStatus",
 				"name": "status",
 				"type": "uint8"
@@ -278,6 +284,11 @@
 				"internalType": "uint64",
 				"name": "depositNonce",
 				"type": "uint64"
+			},
+			{
+				"internalType": "enum SignatureCollector.TransferType",
+				"name": "typ",
+				"type": "uint8"
 			},
 			{
 				"internalType": "bytes",

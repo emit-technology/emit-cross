@@ -18,75 +18,117 @@ package sero
 
 import (
 	"github.com/emit-technology/emit-cross/types"
+	"math/big"
 )
 
-func (l *listener) handleSrc20DepositedEvent(blockNumer uint64, destId types.ChainId, nonce types.Nonce) (types.FTTransfer, error) {
+func (l *listener) handleSrc20DepositedEvent(blockNumer uint64, destId types.ChainId, nonce types.Nonce) (types.TransferMsg, error) {
+
 	l.log.Info("Handling Src20 fungible deposit event", "src", l.cfg.id, "dest", destId, "nonce", nonce)
 
-	resourcId, recipeint, amount, err := l.state[l.cfg.id].GetDepositRecord(uint64(nonce), uint8(destId))
+	resourcId, recipeint, amount, err := l.state[l.cfg.id].GetDepositFTRecord(uint64(nonce), uint8(destId))
 
 	if err != nil {
 		l.log.Error("Error Unpacking SRC20 Deposit Record", "src", l.cfg.id, "dest", destId, "nonce", nonce, "err", err)
-		return types.FTTransfer{}, err
+		return types.TransferMsg{}, err
 	}
+	return types.NewFungibleTransferMsg(blockNumer, l.cfg.id, destId, nonce, amount, types.ResourceId(resourcId), recipeint), nil
 
-	return types.FTTransfer{
+}
+
+func (l *listener) handleSrc721DepositedEvent(blockNumer uint64, destId types.ChainId, nonce types.Nonce) (types.TransferMsg, error) {
+	l.log.Info("Handling Src721 nonFungible deposit event", "src", l.cfg.id, "dest", destId, "nonce", nonce)
+
+	resourcId, recipeint, amount, metaData, src20Amount, err := l.state[l.cfg.id].GetDepositNFTRecord(uint64(nonce), uint8(destId))
+
+	if err != nil {
+		l.log.Error("Error Unpacking SRC20 Deposit Record", "src", l.cfg.id, "dest", destId, "nonce", nonce, "err", err)
+		return types.TransferMsg{}, err
+	}
+	return types.NewNonFungibleTransferMsg(
 		blockNumer,
 		l.cfg.id,
 		destId,
 		nonce,
+		amount,
 		types.ResourceId(resourcId),
 		recipeint,
-		amount,
-	}, nil
+		metaData,
+		src20Amount,
+	), nil
 }
 
-func (l *listener) handleProposalEvent(blockNumer uint64, soruceId types.ChainId, nonce types.Nonce) (types.FTTransfer, error) {
+func (l *listener) handleSrc20ProposalEvent(blockNumer uint64, soruceId types.ChainId, nonce types.Nonce) (types.TransferMsg, error) {
 
-	l.log.Info("Handling passed Proposal event", "src", soruceId, "dest", l.cfg.id, "nonce", nonce)
+	l.log.Info("Handling passed src20 Proposal event", "src", soruceId, "dest", l.cfg.id, "nonce", nonce)
 
-	resourcId, recipeint, amount, err := l.state[soruceId].GetDepositRecord(uint64(nonce), uint8(l.cfg.id))
+	resourcId, recipeint, amount, err := l.state[soruceId].GetDepositFTRecord(uint64(nonce), uint8(l.cfg.id))
 
 	if err != nil {
 		l.log.Error("Error Unpacking Soruce Deposit Record", "src", soruceId, "dest", l.cfg.id, "nonce", nonce, "err", err)
-		return types.FTTransfer{}, err
+		return types.TransferMsg{}, err
 	}
 
-	return types.FTTransfer{
-		blockNumer,
-		soruceId,
-		l.cfg.id,
-		nonce,
-		types.ResourceId(resourcId),
-		recipeint,
-		amount,
-	}, nil
+	return types.NewFungibleTransferMsg(blockNumer, soruceId, l.cfg.id, nonce, amount, types.ResourceId(resourcId), recipeint), nil
 }
 
-func (l *listener) handleDestProposalEvent(blockNumer uint64, soruceId types.ChainId, destId types.ChainId, nonce types.Nonce) (uint8, types.BatchVotes, error) {
+func (l *listener) handleSrc721ProposalEvent(blockNumer uint64, soruceId types.ChainId, nonce types.Nonce) (types.TransferMsg, error) {
+
+	l.log.Info("Handling passed src721 Proposal event", "src", soruceId, "dest", l.cfg.id, "nonce", nonce)
+
+	resourcId, recipeint, amount, metadata, _, err := l.state[soruceId].GetDepositNFTRecord(uint64(nonce), uint8(l.cfg.id))
+
+	if err != nil {
+		l.log.Error("Error Unpacking Soruce Deposit Record", "src", soruceId, "dest", l.cfg.id, "nonce", nonce, "err", err)
+		return types.TransferMsg{}, err
+	}
+
+	return types.NewNonFungibleTransferMsg(blockNumer, soruceId, l.cfg.id, nonce, amount, types.ResourceId(resourcId), recipeint, metadata, big.NewInt(0)), nil
+}
+
+func (l *listener) handleDestFungibleProposalSignEvent(blockNumer uint64, soruceId types.ChainId, destId types.ChainId, nonce types.Nonce) (uint8, types.ProposalSignatures, error) {
 	l.log.Info("Handling dest passed SignProposal event", "src", soruceId, "dest", destId, "nonce", nonce)
-	resourcId, recipeint, amount, err := l.state[soruceId].GetDepositRecord(uint64(nonce), uint8(destId))
+	resourcId, recipeint, amount, err := l.state[soruceId].GetDepositFTRecord(uint64(nonce), uint8(destId))
 
 	if err != nil {
 		l.log.Error("Error Unpacking Soruce Deposit Record", "src", soruceId, "dest", destId, "nonce", nonce, "err", err)
-		return 0, types.BatchVotes{}, err
+		return 0, types.ProposalSignatures{}, err
 	}
 	status, signatures, err := l.writer.GetProposalSignatures(uint8(soruceId), uint8(destId), uint64(nonce))
 
 	if err != nil {
 		l.log.Error("Error Unpacking GetProposalSignatures", "src", soruceId, "dest", destId, "nonce", nonce, "err", err)
 
-		return 0, types.BatchVotes{}, err
+		return 0, types.ProposalSignatures{}, err
 	}
 
-	return status, types.BatchVotes{
-		blockNumer,
+	return status, types.NewFungibleProposalSignatures(blockNumer, soruceId, destId, nonce, amount, types.ResourceId(resourcId), recipeint, signatures), nil
+
+}
+
+func (l *listener) handleDestNonFungibleProposalSignEvent(blockNumer uint64, soruceId types.ChainId, destId types.ChainId, nonce types.Nonce) (uint8, types.ProposalSignatures, error) {
+	l.log.Info("Handling dest passed SignProposal event", "src", soruceId, "dest", destId, "nonce", nonce)
+	resourceId, recipeint, amount, metadata, src20Amount, err := l.state[soruceId].GetDepositNFTRecord(uint64(nonce), uint8(destId))
+
+	if err != nil {
+		l.log.Error("Error Unpacking Soruce Deposit Record", "src", soruceId, "dest", destId, "nonce", nonce, "err", err)
+		return 0, types.ProposalSignatures{}, err
+	}
+	status, signatures, err := l.writer.GetProposalSignatures(uint8(soruceId), uint8(destId), uint64(nonce))
+
+	if err != nil {
+		l.log.Error("Error Unpacking GetProposalSignatures", "src", soruceId, "dest", destId, "nonce", nonce, "err", err)
+
+		return 0, types.ProposalSignatures{}, err
+	}
+
+	return status, types.NewNonFungibleProposalSignatures(blockNumer,
 		soruceId,
 		destId,
 		nonce,
-		types.ResourceId(resourcId),
-		recipeint,
 		amount,
-		signatures,
-	}, nil
+		types.ResourceId(resourceId),
+		recipeint,
+		metadata,
+		src20Amount, signatures), nil
+
 }

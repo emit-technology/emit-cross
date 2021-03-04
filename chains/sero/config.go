@@ -35,6 +35,8 @@ var (
 	AccountEndpointOpt         = "accountEndpoint"
 	BridgeOpt                  = "bridge"
 	src20HandlerOpt            = "src20Handler"
+	NFTBridgeOpt               = "nftBridge"
+	src721HandlerOpt           = "src721Handler"
 	commitNodeOpt              = "commitNode"
 	MaxGasPriceOpt             = "maxGasPrice"
 	GasLimitOpt                = "gasLimit"
@@ -59,16 +61,19 @@ type Config struct {
 	freshStart               bool // Disables loading from blockstore at start
 	bridgeContract           common.Address
 	src20HandlerContract     common.Address
+	nftBridgeContract        common.Address
+	src721HandlerContract    common.Address
 	signatureColletorContact common.Address
-	gasLimit                 *big.Int
-	maxGasPrice              *big.Int
-	http                     bool // Config for type of connection
-	startBlock               *big.Int
-	blockConfirmations       *big.Int
-	commitNode               bool
-	SignMsgStartSeq          *big.Int
-	VoteProposalStartSeq     *big.Int
-	ExecuteProposalStartSeq  *big.Int
+
+	gasLimit                *big.Int
+	maxGasPrice             *big.Int
+	http                    bool // Config for type of connection
+	startBlock              *big.Int
+	blockConfirmations      *big.Int
+	commitNode              bool
+	SignMsgStartSeq         *big.Int
+	VoteProposalStartSeq    *big.Int
+	ExecuteProposalStartSeq *big.Int
 }
 
 // parseChainConfig uses a core.ChainConfig to construct a corresponding Config
@@ -83,12 +88,17 @@ func parseChainConfig(chainCfg *core.ChainConfig) (*Config, error) {
 		freshStart:               chainCfg.FreshStart,
 		bridgeContract:           common.Address{},
 		src20HandlerContract:     common.Address{},
+		nftBridgeContract:        common.Address{},
+		src721HandlerContract:    common.Address{},
 		signatureColletorContact: common.Address{},
 		gasLimit:                 big.NewInt(DefaultGasLimit),
 		maxGasPrice:              big.NewInt(DefaultGasPrice),
 		http:                     false,
 		startBlock:               big.NewInt(0),
 		blockConfirmations:       big.NewInt(0),
+		SignMsgStartSeq:          big.NewInt(0),
+		VoteProposalStartSeq:     big.NewInt(0),
+		ExecuteProposalStartSeq:  big.NewInt(0),
 	}
 
 	if contract, ok := chainCfg.Opts[BridgeOpt]; ok && contract != "" {
@@ -96,6 +106,13 @@ func parseChainConfig(chainCfg *core.ChainConfig) (*Config, error) {
 		delete(chainCfg.Opts, BridgeOpt)
 	} else {
 		return nil, fmt.Errorf("must provide opts.bridge field for sero config")
+	}
+
+	if contract, ok := chainCfg.Opts[NFTBridgeOpt]; ok && contract != "" {
+		config.nftBridgeContract = common.Base58ToAddress(contract)
+		delete(chainCfg.Opts, NFTBridgeOpt)
+	} else {
+		return nil, fmt.Errorf("must provide opts.nftBridge field for sero config")
 	}
 
 	if accountEndpoint, ok := chainCfg.Opts[AccountEndpointOpt]; ok && accountEndpoint != "" {
@@ -107,6 +124,10 @@ func parseChainConfig(chainCfg *core.ChainConfig) (*Config, error) {
 
 	config.src20HandlerContract = common.Base58ToAddress(chainCfg.Opts[src20HandlerOpt])
 	delete(chainCfg.Opts, src20HandlerOpt)
+
+	config.src721HandlerContract = common.Base58ToAddress(chainCfg.Opts[src721HandlerOpt])
+	delete(chainCfg.Opts, src721HandlerOpt)
+
 	if contract, ok := chainCfg.Opts[signatureColletorOpt]; ok && contract != "" {
 		config.signatureColletorContact = common.Base58ToAddress(contract)
 		delete(chainCfg.Opts, signatureColletorOpt)

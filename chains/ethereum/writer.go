@@ -6,6 +6,8 @@ package ethereum
 import (
 	"github.com/emit-technology/emit-cross/bindings/ethereum/Bridge"
 	"github.com/emit-technology/emit-cross/bindings/ethereum/ERC20Handler"
+	"github.com/emit-technology/emit-cross/bindings/ethereum/ERC721Handler"
+	"github.com/emit-technology/emit-cross/bindings/ethereum/NFTBridge"
 	log "github.com/emit-technology/emit-cross/log"
 	metrics "github.com/emit-technology/emit-cross/metrics/types"
 )
@@ -15,14 +17,16 @@ var TransferredStatus uint8 = 3
 var CancelledStatus uint8 = 4
 
 type writer struct {
-	cfg                  Config
-	conn                 Connection
-	bridgeContract       *Bridge.Bridge // instance of bound receiver bridgeContract
-	erc20HandlerContract *ERC20Handler.ERC20Handler
-	log                  log.Logger
-	stop                 <-chan int
-	sysErr               chan<- error // Reports fatal error to core
-	metrics              *metrics.ChainMetrics
+	cfg                   Config
+	conn                  Connection
+	bridgeContract        *Bridge.Bridge // instance of bound receiver bridgeContract
+	nftBridgeContract     *NFTBridge.NFTBridge
+	erc20HandlerContract  *ERC20Handler.ERC20Handler
+	erc721HandlerContract *ERC721Handler.ERC721Handler
+	log                   log.Logger
+	stop                  <-chan int
+	sysErr                chan<- error // Reports fatal error to core
+	metrics               *metrics.ChainMetrics
 }
 
 // NewWriter creates and returns writer
@@ -43,7 +47,12 @@ func (w *writer) start() error {
 }
 
 // setContract adds the bound receiver bridgeContract to the writer
-func (w *writer) setContract(bridge *Bridge.Bridge, handler *ERC20Handler.ERC20Handler) {
+func (w *writer) setContract(bridge *Bridge.Bridge,
+	nftBridge *NFTBridge.NFTBridge,
+	erc20Handler *ERC20Handler.ERC20Handler,
+	erc721Handler *ERC721Handler.ERC721Handler) {
 	w.bridgeContract = bridge
-	w.erc20HandlerContract = handler
+	w.nftBridgeContract = nftBridge
+	w.erc20HandlerContract = erc20Handler
+	w.erc721HandlerContract = erc721Handler
 }

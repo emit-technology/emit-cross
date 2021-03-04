@@ -170,7 +170,7 @@ func (l *listener) pollBlocks() error {
 func (l *listener) getConcernedEventsForBlock(latestBlock *big.Int) error {
 	l.log.Debug("Querying block for deposit events", "block", latestBlock)
 
-	query := buildQuery([]seroCommon.Address{l.cfg.bridgeContract, l.cfg.signatureColletorContact},
+	query := buildQuery([]seroCommon.Address{l.cfg.bridgeContract, l.cfg.nftBridgeContract, l.cfg.signatureColletorContact},
 		latestBlock, latestBlock, utils.Deposit, utils.ProposalEvent, utils.SignProposalEvent)
 
 	// querying for logs
@@ -178,28 +178,37 @@ func (l *listener) getConcernedEventsForBlock(latestBlock *big.Int) error {
 	if err != nil {
 		return fmt.Errorf("unable to Filter Logs: %w", err)
 	}
-	signReqMsgs := []types.FTTransfer{}
-	voteReqMsgs := []types.FTTransfer{}
-	proposalExcuteMsgs := []types.FTTransfer{}
-	batchVotesMsgs := []types.BatchVotes{}
+	signProposalReqMsgs := []types.TransferMsg{}
+
+	voteProposalReqMsgs := []types.TransferMsg{}
+
+	proposalExcuteMsgs := []types.TransferMsg{}
+
+	commitSingaturesMsgs := []types.ProposalSignatures{}
 
 	// read through the log events and handle their deposit event if Handler is recognized
 	for _, log := range logs {
 
-		if log.Address == l.cfg.bridgeContract {
+		if log.Address == l.cfg.bridgeContract || log.Address == l.cfg.nftBridgeContract {
 			if log.Topics[0] == utils.Deposit.GetTopic() {
 				destId := types.ChainId(log.Topics[1].Big().Uint64())
 				nonce := types.Nonce(log.Topics[3].Big().Uint64())
-				m, err := l.handleSrc20DepositedEvent(latestBlock.Uint64(), destId, nonce)
+				var m types.TransferMsg
+				var err error
+				if log.Address == l.cfg.bridgeContract {
+					m, err = l.handleSrc20DepositedEvent(latestBlock.Uint64(), destId, nonce)
+				} else {
+					m, err = l.handleSrc721DepositedEvent(latestBlock.Uint64(), destId, nonce)
+				}
 
 				if err != nil {
 					return err
 				}
 
 				if l.state[m.DestinationId].IsWithCollector() {
-					signReqMsgs = append(signReqMsgs, m)
+					signProposalReqMsgs = append(signProposalReqMsgs, m)
 				} else {
-					voteReqMsgs = append(voteReqMsgs, m)
+					voteProposalReqMsgs = append(voteProposalReqMsgs, m)
 				}
 
 			}
@@ -209,32 +218,52 @@ func (l *listener) getConcernedEventsForBlock(latestBlock *big.Int) error {
 				depositNonce := log.Topics[2].Big().Uint64()
 				status := log.Topics[3].Big().Uint64()
 				if utils.IsPassed(uint8(status)) {
-					m, err := l.handleProposalEvent(latestBlock.Uint64(), types.ChainId(sourceId), types.Nonce(depositNonce))
+					var m types.TransferMsg
+					var err error
+					if log.Address == l.cfg.bridgeContract {
+						m, err = l.handleSrc20ProposalEvent(latestBlock.Uint64(), types.ChainId(sourceId), types.Nonce(depositNonce))
+					} else {
+						m, err = l.handleSrc721ProposalEvent(latestBlock.Uint64(), types.ChainId(sourceId), types.Nonce(depositNonce))
+
+					}
 					if err != nil {
 						return err
 					}
+
 					proposalExcuteMsgs = append(proposalExcuteMsgs, m)
+
 				}
 
 			}
 
 		}
+
 		if log.Address == l.cfg.signatureColletorContact {
 			sourceId := log.Topics[1].Big().Uint64()
 			destId := log.Topics[2].Big().Uint64()
 			depositNonce := log.Topics[3].Big().Uint64()
-			status := new(big.Int).SetBytes(log.Data).Uint64()
+			transferType := new(big.Int).SetBytes(log.Data[:32]).Uint64()
+			status := new(big.Int).SetBytes(log.Data[32:]).Uint64()
 			if utils.IsPassed(uint8(status)) {
-				_, m, err := l.handleDestProposalEvent(latestBlock.Uint64(), types.ChainId(sourceId), types.ChainId(destId), types.Nonce(depositNonce))
+				var m types.ProposalSignatures
+				var err error
+				if transferType == 1 {
+					_, m, err = l.handleDestFungibleProposalSignEvent(latestBlock.Uint64(), types.ChainId(sourceId), types.ChainId(destId), types.Nonce(depositNonce))
+
+				} else {
+					_, m, err = l.handleDestNonFungibleProposalSignEvent(latestBlock.Uint64(), types.ChainId(sourceId), types.ChainId(destId), types.Nonce(depositNonce))
+
+				}
 				if err != nil {
 					return err
 				}
-				batchVotesMsgs = append(batchVotesMsgs, m)
+
+				commitSingaturesMsgs = append(commitSingaturesMsgs, m)
 			}
 		}
 
-		if len(signReqMsgs) > 0 {
-			for _, m := range signReqMsgs {
+		if len(signProposalReqMsgs) > 0 {
+			for _, m := range signProposalReqMsgs {
 				err = l.chainDB.AddSignReq(m)
 				if err != nil {
 					l.log.Error("chainDB: failed to add sign req", "err", err)
@@ -242,8 +271,9 @@ func (l *listener) getConcernedEventsForBlock(latestBlock *big.Int) error {
 				}
 			}
 		}
-		if len(voteReqMsgs) > 0 {
-			for _, m := range voteReqMsgs {
+
+		if len(voteProposalReqMsgs) > 0 {
+			for _, m := range voteProposalReqMsgs {
 				err = l.chainDB.AddProposalMsg(m)
 				if err != nil {
 					l.log.Error("chainDB: failed to add vote req", "err", err)
@@ -251,6 +281,7 @@ func (l *listener) getConcernedEventsForBlock(latestBlock *big.Int) error {
 				}
 			}
 		}
+
 		if len(proposalExcuteMsgs) > 0 {
 			for _, m := range proposalExcuteMsgs {
 				err = l.chainDB.AddExecuteMsg(m)
@@ -260,9 +291,8 @@ func (l *listener) getConcernedEventsForBlock(latestBlock *big.Int) error {
 				}
 			}
 		}
-
-		if len(batchVotesMsgs) > 0 {
-			for _, m := range batchVotesMsgs {
+		if len(commitSingaturesMsgs) > 0 {
+			for _, m := range commitSingaturesMsgs {
 				err = l.chainDB.AddBatchVotesMsg(m)
 				if err != nil {
 					l.log.Error("chainDB: failed to add  batchVotesMsg", "err", err)
@@ -270,6 +300,7 @@ func (l *listener) getConcernedEventsForBlock(latestBlock *big.Int) error {
 				}
 			}
 		}
+
 	}
 
 	return nil
@@ -293,14 +324,30 @@ func buildQuery(contracts []seroCommon.Address, startBlock *big.Int, endBlock *b
 }
 
 // proposalIsComplete returns true if the proposal state is either Passed, Transferred or Cancelled
-func (l *listener) DestProposalIsComplete(srcId types.ChainId, dest types.ChainId, nonce types.Nonce) bool {
-	_, r, a, e := l.state[srcId].GetDepositRecord(uint64(nonce), uint8(dest))
-	if e != nil {
-		l.log.Error("Failed to check deposit existence", "err", e)
-		return false
+func (l *listener) DestProposalIsComplete(srcId types.ChainId, dest types.ChainId, nonce types.Nonce, typ types.TransferType) bool {
+	var dataHash [32]byte
+	var prop uint8
+	var err error
+	if typ == types.FungibleTransfer {
+		_, r, a, e := l.state[srcId].GetDepositFTRecord(uint64(nonce), uint8(dest))
+		if e != nil {
+			l.log.Error("Failed to check deposit existence", "err", e)
+			return false
+		}
+		dataHash = l.state[dest].FTPropsalDataHash(r, a)
+		prop, err = l.state[dest].GetFTProposalStatus(uint8(srcId), uint64(nonce), dataHash)
+
+	} else {
+		_, r, a, metadata, feeAmount, e := l.state[srcId].GetDepositNFTRecord(uint64(nonce), uint8(dest))
+		if e != nil {
+			l.log.Error("Failed to check deposit existence", "err", e)
+			return false
+		}
+		dataHash = l.state[dest].NFTPropsalDataHash(r, a, metadata, feeAmount)
+		prop, err = l.state[dest].GetNFTProposalStatus(uint8(srcId), uint64(nonce), dataHash)
+
 	}
-	dataHash := l.state[dest].PropsalDataHash(r, a)
-	prop, err := l.state[dest].GetProposalStatus(uint8(srcId), uint64(nonce), dataHash)
+
 	if err != nil {
 		l.log.Error("Failed to check proposal existence", "err", err)
 		return false
@@ -308,16 +355,15 @@ func (l *listener) DestProposalIsComplete(srcId types.ChainId, dest types.ChainI
 	return prop == PassedStatus || prop == TransferredStatus || prop == CancelledStatus
 }
 
-func (l *listener) shouldSign(m types.FTTransfer) bool {
-	// Check if proposal has passed and skip if Passed or Transferred
-	if l.DestProposalIsComplete(m.SourceId, m.DestinationId, m.DepositNonce) {
-		l.log.Info("Proposal On dest chain complete", "src", m.SourceId, "dest", m.DestinationId, "nonce", m.DepositNonce)
+func (l *listener) shouldSign(m types.TransferMsg) bool {
+	if l.DestProposalIsComplete(m.SourceId, m.DestinationId, m.DepositNonce, m.Type) {
+		l.log.Info("Proposal On dest chain complete", "typ", m.Type, "src", m.SourceId, "dst", m.DestinationId, "nonce", m.DepositNonce)
 		return false
 	}
 
 	// Check if relayer has previously voted
 	if l.writer.hasSigned(m.SourceId, m.DestinationId, m.DepositNonce) {
-		l.log.Info("Relayer has already sign", "src", m.SourceId, "dest", m.DestinationId, "nonce", m.DepositNonce)
+		l.log.Info("Relayer has already sign", "typ", m.Type, "src", m.SourceId, "dst", m.DestinationId, "nonce", m.DepositNonce)
 		return false
 	}
 

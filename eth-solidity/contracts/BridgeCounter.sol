@@ -5,15 +5,14 @@ import "./interfaces/IBridgeCounter.sol";
 
 contract BridgeCounter is IBridgeCounter{
 
-    address public bridge;
+    mapping(address => bool) public approvedBridge;
 
     address public owner;
 
     // destinationChainID => number of deposits
     mapping(uint8 => uint64) public depositCounts;
 
-    constructor(address bridge_) public {
-        bridge = bridge_;
+    constructor() public {
         owner = msg.sender;
     }
 
@@ -25,7 +24,7 @@ contract BridgeCounter is IBridgeCounter{
     }
 
     modifier onlyBridge() {
-        require(msg.sender == bridge,
+        require(approvedBridge[msg.sender],
             "sender is not bridge");
         _;
     }
@@ -34,8 +33,11 @@ contract BridgeCounter is IBridgeCounter{
         return ++depositCounts[destinationChainID];
     }
 
-    function setBridge(address bridge_) public onlyOwner {
-        bridge = bridge_;
+    function addBridge(address bridge_) public onlyOwner {
+        approvedBridge[bridge_] = true;
+    }
+    function removeBridge(address bridge_) public onlyOwner{
+        delete approvedBridge[bridge_];
     }
 
     function setDestStartNonce(uint8 destinationChainID,uint64 start) public onlyOwner {

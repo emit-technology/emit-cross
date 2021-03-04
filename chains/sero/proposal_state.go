@@ -21,12 +21,25 @@ import (
 	"math/big"
 )
 
-func (w *writer) GetDepositRecord(nonce uint64, dest uint8) (resourceID [32]byte, destinationRecipientAddress []byte, amount *big.Int, err error) {
+func (w *writer) GetDepositFTRecord(nonce uint64, dest uint8) (resourceID [32]byte, destinationRecipientAddress []byte, amount *big.Int, err error) {
 	prop, err := w.src20HandlerContract.GetDepositRecord(w.conn.CallOpts(), nonce, dest)
 	if err != nil {
 		return [32]byte{}, nil, nil, err
 	}
 	return prop.ResourceID, prop.DestinationRecipientAddress, prop.Amount, nil
+}
+
+func (w *writer) GetDepositNFTRecord(nonce uint64, dest uint8) (src721ResourceID [32]byte,
+	destinationRecipientAddress []byte,
+	tokenId *big.Int,
+	metadata []byte,
+	src20Amount *big.Int,
+	err error) {
+	prop, err := w.src721HandlerContract.GetDepositRecord(w.conn.CallOpts(), nonce, dest)
+	if err != nil {
+		return [32]byte{}, nil, nil, nil, nil, err
+	}
+	return prop.TicketResourceID, prop.DestinationRecipientAddress, prop.TokenID, prop.MetaData, prop.Amount, nil
 }
 
 func (w *writer) GetProposalSignatures(srcId, dest uint8, nonce uint64) (status uint8, signatures [][]byte, err error) {
@@ -38,11 +51,30 @@ func (w *writer) GetProposalSignatures(srcId, dest uint8, nonce uint64) (status 
 	return
 }
 
-func (w *writer) PropsalDataHash(recipient []byte, amount *big.Int) [32]byte {
-	return ConstructSrc20ProposalDataHash(w.cfg.src20HandlerContract, seroCommon.BytesToAddress(recipient), amount)
+func (w *writer) FTPropsalDataHash(recipient []byte, amount *big.Int) [32]byte {
+	return ConstructSRC20ProposalDataHash(w.cfg.src20HandlerContract, seroCommon.BytesToAddress(recipient), amount)
+
 }
-func (w *writer) GetProposalStatus(source uint8, nonce uint64, dataHash [32]byte) (uint8, error) {
+
+func (w *writer) NFTPropsalDataHash(recipient []byte, tokenId *big.Int, metadata []byte, feeAmount *big.Int) [32]byte {
+	return ConstructSRC721ProposalDataHash(w.cfg.src721HandlerContract, seroCommon.BytesToAddress(recipient), tokenId, metadata)
+
+}
+
+func (w *writer) GetFTProposalStatus(source uint8, nonce uint64, dataHash [32]byte) (uint8, error) {
+
 	prop, err := w.bridgeContract.GetProposal(w.conn.CallOpts(), uint8(source), uint64(nonce), dataHash)
+
+	if err != nil {
+		w.log.Error("Failed to check proposal existence", "err", err)
+		return 0, err
+	}
+	return prop.Status, nil
+}
+
+func (w *writer) GetNFTProposalStatus(source uint8, nonce uint64, dataHash [32]byte) (uint8, error) {
+
+	prop, err := w.nftBridgeContract.GetProposal(w.conn.CallOpts(), uint8(source), uint64(nonce), dataHash)
 	if err != nil {
 		w.log.Error("Failed to check proposal existence", "err", err)
 		return 0, err
@@ -51,6 +83,9 @@ func (w *writer) GetProposalStatus(source uint8, nonce uint64, dataHash [32]byte
 }
 func (w *writer) GetBridgeAddress() []byte {
 	return w.cfg.bridgeContract.Bytes()
+}
+func (w *writer) GetNFTBridgeAddress() []byte {
+	return w.cfg.nftBridgeContract.Bytes()
 }
 func (w *writer) IsWithCollector() bool {
 	return false

@@ -1,8 +1,8 @@
 pragma solidity 0.6.4;
 pragma experimental ABIEncoderV2;
 
-import 'github.com/Uniswap/uniswap-v2-core//contracts/interfaces/IUniswapV2Pair.sol';
-import "github.com/OpenZeppelin/openzeppelin-contracts/contracts/math/SafeMath.sol";
+import '@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol';
+import "@openzeppelin/contracts/math/SafeMath.sol";
 
 import "./interfaces/ICrossFee.sol";
 

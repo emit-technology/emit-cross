@@ -20,44 +20,14 @@ import (
 	"github.com/emit-technology/emit-cross/types"
 )
 
-func (l *listener) handleTrc20DepositedEvent(blockNumer uint64, destId types.ChainId, nonce types.Nonce) (types.FTTransfer, error) {
+func (l *listener) handleTrc20DepositedEvent(blockNumer uint64, destId types.ChainId, nonce types.Nonce) (types.TransferMsg, error) {
 	l.log.Info("Handling Trc20 fungible deposit event", "src", l.cfg.id, "dest", destId, "nonce", nonce)
 
-	resourcId, recipeint, amount, err := l.state[l.cfg.id].GetDepositRecord(uint64(nonce), uint8(destId))
+	resourcId, recipeint, amount, err := l.state[l.cfg.id].GetDepositFTRecord(uint64(nonce), uint8(destId))
 
 	if err != nil {
 		l.log.Error("Error Unpacking SRC20 Deposit Record", "src", l.cfg.id, "dest", destId, "nonce", nonce, "err", err)
-		return types.FTTransfer{}, err
+		return types.TransferMsg{}, err
 	}
-
-	return types.FTTransfer{
-		blockNumer,
-		l.cfg.id,
-		destId,
-		nonce,
-		types.ResourceId(resourcId),
-		recipeint,
-		amount,
-	}, nil
-}
-
-func (l *listener) handleProposalEvent(blockNumer uint64, soruceId types.ChainId, nonce types.Nonce) (types.FTTransfer, error) {
-	l.log.Info("Handling passed Proposal event", "src", soruceId, "src", l.cfg.id, "nonce", nonce)
-
-	resourcId, recipeint, amount, err := l.state[soruceId].GetDepositRecord(uint64(nonce), uint8(l.cfg.id))
-
-	if err != nil {
-		l.log.Error("Error Unpacking Soruce Deposit Record", "src", soruceId, "dest", l.cfg.id, "nonce", nonce, "err", err)
-		return types.FTTransfer{}, err
-	}
-
-	return types.FTTransfer{
-		blockNumer,
-		soruceId,
-		l.cfg.id,
-		nonce,
-		types.ResourceId(resourcId),
-		recipeint,
-		amount,
-	}, nil
+	return types.NewFungibleTransferMsg(blockNumer, l.cfg.id, destId, nonce, amount, types.ResourceId(resourcId), recipeint), nil
 }

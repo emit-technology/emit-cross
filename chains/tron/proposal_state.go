@@ -26,7 +26,7 @@ import (
 	"strconv"
 )
 
-func (w *writer) GetDepositRecord(nonce uint64, dest uint8) (resourceID [32]byte, destinationRecipientAddress []byte, amount *big.Int, err error) {
+func (w *writer) GetDepositFTRecord(nonce uint64, dest uint8) (resourceID [32]byte, destinationRecipientAddress []byte, amount *big.Int, err error) {
 	params := []abi.Param{
 		{"uint64": strconv.FormatUint(nonce, 10)},
 		{"uint8": strconv.FormatUint(uint64(dest), 10)},
@@ -59,15 +59,35 @@ func (w *writer) GetDepositRecord(nonce uint64, dest uint8) (resourceID [32]byte
 	return
 }
 
-func (w *writer) PropsalDataHash(recipient []byte, amount *big.Int) [32]byte {
+func (w *writer) GetDepositNFTRecord(nonce uint64, dest uint8) (src721ResourceID [32]byte,
+	destinationRecipientAddress []byte,
+	tokenId *big.Int,
+	metadata []byte,
+	src20Amount *big.Int,
+	err error) {
+	panic("not support!")
+}
+
+func (w *writer) FTPropsalDataHash(recipient []byte, amount *big.Int) [32]byte {
 	return ConstructTrc20ProposalDataHash(w.cfg.trc20HandlerContract, recipient, amount)
 }
-func (w *writer) GetProposalStatus(source uint8, nonce uint64, dataHash [32]byte) (uint8, error) {
+func (w *writer) GetFTProposalStatus(source uint8, nonce uint64, dataHash [32]byte) (uint8, error) {
 	return w.prosalStatus(types.ChainId(source), types.Nonce(nonce), dataHash)
 }
+
+func (w *writer) NFTPropsalDataHash(recipient []byte, tokenId *big.Int, metadata []byte, feeAmount *big.Int) [32]byte {
+	panic("not support!")
+}
+func (w *writer) GetNFTProposalStatus(source uint8, nonce uint64, dataHash [32]byte) (uint8, error) {
+	panic("not support!")
+}
+
 func (w *writer) GetBridgeAddress() []byte {
 	addr, _ := address.Base58ToAddress(w.cfg.bridgeContract)
 	return addr[:]
+}
+func (w *writer) GetNFTBridgeAddress() []byte {
+	panic("not support!")
 }
 func (w *writer) IsWithCollector() bool {
 	return true

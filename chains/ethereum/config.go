@@ -21,6 +21,7 @@ const DefaultBlockConfirmations = 12
 // Chain specific options
 var (
 	BridgeOpt              = "bridge"
+	NFTBridgeOpt           = "nftBridge"
 	Erc20HandlerOpt        = "erc20Handler"
 	Erc721HandlerOpt       = "erc721Handler"
 	GenericHandlerOpt      = "genericHandler"
@@ -35,22 +36,24 @@ var (
 
 // Config encapsulates all necessary parameters in ethereum compatible forms
 type Config struct {
-	name                 string        // Human-readable chain name
-	id                   types.ChainId // ChainID
-	endpoint             string        // url for rpc endpoint
-	from                 string        // address of key to use
-	keystorePath         string        // Location of keyfiles
-	blockstorePath       string
-	freshStart           bool // Disables loading from blockstore at start
-	bridgeContract       common.Address
-	erc20HandlerContract common.Address
-	gasLimit             *big.Int
-	maxGasPrice          *big.Int
-	http                 bool // Config for type of connection
-	startBlock           *big.Int
-	blockConfirmations   *big.Int
-	commitVotesStartSeq  *big.Int
-	commitNode           bool
+	name                  string        // Human-readable chain name
+	id                    types.ChainId // ChainID
+	endpoint              string        // url for rpc endpoint
+	from                  string        // address of key to use
+	keystorePath          string        // Location of keyfiles
+	blockstorePath        string
+	freshStart            bool // Disables loading from blockstore at start
+	bridgeContract        common.Address
+	nftBridgeContract     common.Address
+	erc20HandlerContract  common.Address
+	erc721HandlerContract common.Address
+	gasLimit              *big.Int
+	maxGasPrice           *big.Int
+	http                  bool // Config for type of connection
+	startBlock            *big.Int
+	blockConfirmations    *big.Int
+	commitVotesStartSeq   *big.Int
+	commitNode            bool
 }
 
 // parseChainConfig uses a core.ChainConfig to construct a corresponding Config
@@ -70,6 +73,7 @@ func parseChainConfig(chainCfg *core.ChainConfig) (*Config, error) {
 		http:                 false,
 		startBlock:           big.NewInt(0),
 		blockConfirmations:   big.NewInt(0),
+		commitVotesStartSeq:  big.NewInt(0),
 	}
 
 	if contract, ok := chainCfg.Opts[BridgeOpt]; ok && contract != "" {
@@ -79,8 +83,18 @@ func parseChainConfig(chainCfg *core.ChainConfig) (*Config, error) {
 		return nil, fmt.Errorf("must provide opts.bridge field for sero config")
 	}
 
+	if contract, ok := chainCfg.Opts[NFTBridgeOpt]; ok && contract != "" {
+		config.nftBridgeContract = common.HexToAddress(contract)
+		delete(chainCfg.Opts, NFTBridgeOpt)
+	} else {
+		return nil, fmt.Errorf("must provide opts.nftbridge field for sero config")
+	}
+
 	config.erc20HandlerContract = common.HexToAddress(chainCfg.Opts[Erc20HandlerOpt])
 	delete(chainCfg.Opts, Erc20HandlerOpt)
+
+	config.erc721HandlerContract = common.HexToAddress(chainCfg.Opts[Erc721HandlerOpt])
+	delete(chainCfg.Opts, Erc721HandlerOpt)
 
 	if gasPrice, ok := chainCfg.Opts[MaxGasPriceOpt]; ok {
 		price := big.NewInt(0)

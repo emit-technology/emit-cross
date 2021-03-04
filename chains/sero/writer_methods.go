@@ -22,8 +22,7 @@ import (
 	"github.com/emit-technology/emit-cross/types"
 	seroCommon "github.com/sero-cash/go-sero/common"
 	seroTypes "github.com/sero-cash/go-sero/core/types"
-
-	"github.com/sero-cash/go-sero/common/hexutil"
+	"math/big"
 )
 
 // Number of blocks to wait for an finalization event
@@ -37,49 +36,79 @@ var ErrFatalTx = errors.New("submission of transaction failed")
 var ErrFatalQuery = errors.New("query of chain state failed")
 
 // proposalIsComplete returns true if the proposal state is either Passed, Transferred or Cancelled
-func (w *writer) proposalIsComplete(srcId types.ChainId, nonce types.Nonce, dataHash [32]byte) bool {
-	prop, err := w.bridgeContract.GetProposal(w.conn.CallOpts(), uint8(srcId), uint64(nonce), dataHash)
-	if err != nil {
-		w.log.Error("Failed to check proposal existence", "err", err)
-		return false
+func (w *writer) proposalIsComplete(srcId types.ChainId, nonce types.Nonce, typ types.TransferType, dataHash [32]byte) bool {
+	if typ == types.FungibleTransfer {
+		prop, err := w.bridgeContract.GetProposal(w.conn.CallOpts(), uint8(srcId), uint64(nonce), dataHash)
+		if err != nil {
+			w.log.Error("Failed to check proposal existence", "err", err)
+			return false
+		}
+		return prop.Status == PassedStatus || prop.Status == TransferredStatus || prop.Status == CancelledStatus
+	} else {
+		prop, err := w.nftBridgeContract.GetProposal(w.conn.CallOpts(), uint8(srcId), uint64(nonce), dataHash)
+		if err != nil {
+			w.log.Error("Failed to check proposal existence", "err", err)
+			return false
+		}
+		return prop.Status == PassedStatus || prop.Status == TransferredStatus || prop.Status == CancelledStatus
 	}
-	return prop.Status == PassedStatus || prop.Status == TransferredStatus || prop.Status == CancelledStatus
+
 }
 
 // proposalIsComplete returns true if the proposal state is Transferred or Cancelled
-func (w *writer) proposalIsFinalized(srcId types.ChainId, nonce types.Nonce, dataHash [32]byte) bool {
-	prop, err := w.bridgeContract.GetProposal(w.conn.CallOpts(), uint8(srcId), uint64(nonce), dataHash)
-	if err != nil {
-		w.log.Error("Failed to check proposal existence", "err", err)
-		return false
+func (w *writer) proposalIsFinalized(srcId types.ChainId, nonce types.Nonce, typ types.TransferType, dataHash [32]byte) bool {
+	if typ == types.FungibleTransfer {
+		prop, err := w.bridgeContract.GetProposal(w.conn.CallOpts(), uint8(srcId), uint64(nonce), dataHash)
+		if err != nil {
+			w.log.Error("Failed to check proposal existence", "err", err)
+			return false
+		}
+		return prop.Status == TransferredStatus || prop.Status == CancelledStatus // Transferred (3)
+	} else {
+		prop, err := w.nftBridgeContract.GetProposal(w.conn.CallOpts(), uint8(srcId), uint64(nonce), dataHash)
+		if err != nil {
+			w.log.Error("Failed to check proposal existence", "err", err)
+			return false
+		}
+		return prop.Status == TransferredStatus || prop.Status == CancelledStatus // Transferred (3)
 	}
-	return prop.Status == TransferredStatus || prop.Status == CancelledStatus // Transferred (3)
 }
 
 // hasVoted checks if this relayer has already voted
-func (w *writer) hasVoted(srcId types.ChainId, nonce types.Nonce, dataHash [32]byte) bool {
-	hasVoted, err := w.bridgeContract.HasVotedOnProposal(w.conn.CallOpts(), common.IDAndNonce(srcId, nonce), dataHash, common.GenCommonAddress(w.conn.Keypair()))
+func (w *writer) hasVoted(srcId types.ChainId, nonce types.Nonce, typ types.TransferType, dataHash [32]byte) bool {
+	var hasVoted bool
+	var err error
+	if typ == types.FungibleTransfer {
+		hasVoted, err = w.bridgeContract.HasVotedOnProposal(w.conn.CallOpts(), common.IDAndNonce(srcId, nonce), dataHash, common.GenCommonAddress(w.conn.Keypair()))
+
+	} else {
+		hasVoted, err = w.nftBridgeContract.HasVotedOnProposal(w.conn.CallOpts(), common.IDAndNonce(srcId, nonce), dataHash, common.GenCommonAddress(w.conn.Keypair()))
+	}
 
 	if err != nil {
 		w.log.Error("Failed to check proposal existence", "err", err)
 		return false
 	}
-
 	return hasVoted
 }
 
-func (w *writer) shouldVote(m types.FTTransfer) bool {
-	dataHash := ConstructSrc20ProposalDataHash(w.cfg.src20HandlerContract, seroCommon.BytesToAddress(m.Recipient), m.Amount)
+func (w *writer) shouldVote(m types.TransferMsg) bool {
 
-	// Check if proposal has passed and skip if Passed or Transferred
-	if w.proposalIsComplete(m.SourceId, m.DepositNonce, dataHash) {
-		w.log.Info("Proposal complete, not voting", "src", m.SourceId, "nonce", m.DepositNonce)
+	var dataHash [32]byte
+	if m.Type == types.FungibleTransfer {
+		dataHash = ConstructSRC20ProposalDataHash(w.cfg.src20HandlerContract, seroCommon.BytesToAddress(m.Payload[1]), new(big.Int).SetBytes(m.Payload[0]))
+	} else {
+		dataHash = ConstructSRC721ProposalDataHash(w.cfg.src721HandlerContract, seroCommon.BytesToAddress(m.Payload[1]), new(big.Int).SetBytes(m.Payload[0]), m.Payload[2])
+	}
+
+	if w.proposalIsComplete(m.SourceId, m.DepositNonce, m.Type, dataHash) {
+		w.log.Info("Proposal complete, not voting", "type", m.Type, "src", m.SourceId, "dst", m.DestinationId, "nonce", m.DepositNonce)
 		return false
 	}
 
 	// Check if relayer has previously voted
-	if w.hasVoted(m.SourceId, m.DepositNonce, dataHash) {
-		w.log.Info("Relayer has already voted, not voting", "src", m.SourceId, "nonce", m.DepositNonce)
+	if w.hasVoted(m.SourceId, m.DepositNonce, m.Type, dataHash) {
+		w.log.Info("Relayer has already voted, not voting", "type", m.Type, "src", m.SourceId, "dst", m.DestinationId, "nonce", m.DepositNonce)
 		return false
 	}
 
@@ -88,23 +117,35 @@ func (w *writer) shouldVote(m types.FTTransfer) bool {
 
 // voteProposal submits a vote proposal
 // a vote proposal will try to be submitted up to the TxRetryLimit times
-func (w *writer) voteProposal(m types.FTTransfer) (*seroTypes.Transaction, error) {
-
-	dataHash := ConstructSrc20ProposalDataHash(w.cfg.src20HandlerContract, seroCommon.BytesToAddress(m.Recipient), m.Amount)
+func (w *writer) voteProposal(m types.TransferMsg) (*seroTypes.Transaction, error) {
 
 	err := w.conn.LockAndUpdateOpts()
 	if err != nil {
 		w.log.Error("Failed to update tx opts", "err", err)
 		return nil, err
 	}
+	var dataHash [32]byte
+	var tx *seroTypes.Transaction
+	if m.Type == types.FungibleTransfer {
+		dataHash = ConstructSRC20ProposalDataHash(w.cfg.src20HandlerContract, seroCommon.BytesToAddress(m.Payload[1]), new(big.Int).SetBytes(m.Payload[0]))
+		tx, err = w.bridgeContract.VoteProposal(
+			w.conn.Opts(),
+			uint8(m.SourceId),
+			uint64(m.DepositNonce),
+			m.ResourceId,
+			dataHash,
+		)
+	} else {
+		dataHash = ConstructSRC721ProposalDataHash(w.cfg.src721HandlerContract, seroCommon.BytesToAddress(m.Payload[1]), new(big.Int).SetBytes(m.Payload[0]), m.Payload[2])
+		tx, err = w.nftBridgeContract.VoteProposal(
+			w.conn.Opts(),
+			uint8(m.SourceId),
+			uint64(m.DepositNonce),
+			m.ResourceId,
+			dataHash,
+		)
+	}
 
-	tx, err := w.bridgeContract.VoteProposal(
-		w.conn.Opts(),
-		uint8(m.SourceId),
-		uint64(m.DepositNonce),
-		m.ResourceId,
-		dataHash,
-	)
 	w.conn.UnlockOpts()
 
 	if err == nil {
@@ -123,28 +164,43 @@ func (w *writer) voteProposal(m types.FTTransfer) (*seroTypes.Transaction, error
 }
 
 // executeProposal executes the proposal
-func (w *writer) executeProposal(m types.FTTransfer) (*seroTypes.Transaction, error) {
+func (w *writer) executeProposal(m types.TransferMsg) (*seroTypes.Transaction, error) {
 
 	err := w.conn.LockAndUpdateOpts()
 	if err != nil {
 		w.log.Error("Failed to update nonce", "err", err)
 		return nil, err
 	}
-	recipeint := seroCommon.BytesToAddress(m.Recipient)
-	tx, err := w.bridgeContract.ExecuteProposal(
-		w.conn.Opts(),
-		uint8(m.SourceId),
-		uint64(m.DepositNonce),
-		m.ResourceId,
-		recipeint,
-		m.Amount,
-	)
+	recipeint := seroCommon.BytesToAddress(m.Payload[1])
+	var tx *seroTypes.Transaction
+
+	if m.Type == types.FungibleTransfer {
+		tx, err = w.bridgeContract.ExecuteProposal(
+			w.conn.Opts(),
+			uint8(m.SourceId),
+			uint64(m.DepositNonce),
+			m.ResourceId,
+			recipeint,
+			new(big.Int).SetBytes(m.Payload[0]),
+		)
+	} else {
+		tx, err = w.nftBridgeContract.ExecuteProposal(
+			w.conn.Opts(),
+			uint8(m.SourceId),
+			uint64(m.DepositNonce),
+			m.ResourceId,
+			recipeint,
+			new(big.Int).SetBytes(m.Payload[0]),
+			m.Payload[2])
+
+	}
+
 	w.conn.UnlockOpts()
 
 	if err == nil {
-		w.log.Info("Submitted proposal execution", "tx", tx.Hash(), "src", m.SourceId, "dst", m.DestinationId, "nonce", m.DepositNonce,
-			"recipient", hexutil.Encode(m.Recipient),
-			"amount", m.Amount.String())
+		w.log.Info("Submitted proposal execution", "type", m.Type, "tx", tx.Hash(), "src", m.SourceId, "dst", m.DestinationId, "nonce", m.DepositNonce,
+			"recipient", recipeint.String(),
+			"amoutOrTokenId", new(big.Int).SetBytes(m.Payload[0]))
 		return tx, nil
 	} else if err.Error() == ErrNonceTooLow.Error() || err.Error() == ErrTxUnderpriced.Error() {
 		w.log.Error("Nonce too low, will retry")

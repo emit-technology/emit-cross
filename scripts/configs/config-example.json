@@ -8,8 +8,10 @@
       "endpoint" : "ws://127.0.0.1:8546",
       "opts" : {
         "bridge" : "0xC7c287200D0952d4f591509463fD5203C7D88F56",
+        "nftbridge":"0x2a09bd75fbB293456E33fF180919a704650219b0",
         "erc20Handler": "0xB47E605e2daAfBD2A3F44216c47033FE71c96A2F",
-        "startBlock":  "0",
+        "erc721Handler":"0x85c5bb4a9a745d71d2ed85082bf670a9af82d435",
+        "startBlock":  "11787310",
         "blockConfirmations":"0",
         "commitNode":"true"
       }
@@ -35,7 +37,9 @@
       "opts" : {
         "gasLimit" : "1000000",
         "bridge" : "5Pnnu6DNrgctaoNPRfKUww3KroYFFaeGLTZphJMGbP6EHtejuRcVT86jMwgBeWtiiDujnmrQpPhdzGhwzaWxj49b",
+        "nftbridge":"4pL8tsyngtGEXjHNKfs81wpjkq6MgpnwYN1C2kAYdHqkzLMuUvZTEmSXYLLZ9BgQAPTn91huT9Vu1FNA3VcoQgTr",
         "src20Handler": "5Z2jSbr7jXBX31qKbNneaFD4NLkv6EwLqVnUsrw5KAQzdFJZHyndq9eZs3Su2LLVC1NsVpB545XDrFm1NoKwgHn8",
+        "src721Handler":"2rgbU5kWXgWh6JZRUFTmGfZ17Tkm84n3CTtQenXXYkRAz5ZhvtTV93FjjjWSabQpAaRWXQvYhmmxHjPjW7m63NaH",
         "signatureColletor": "5wmfT3haPS6sYvMSNF7PSGCpXnk7Xr2jBbj5QH5NrxNksEbbBEUhxDXtBhgXo3BJ78twSvT38buqobrWf17if6Tm",
         "accountEndpoint":"http://127.0.0.1:8547",
         "startBlock":  "0",

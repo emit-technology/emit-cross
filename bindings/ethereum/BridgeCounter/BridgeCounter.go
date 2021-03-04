@@ -27,19 +27,19 @@ var (
 )
 
 // BridgeCounterABI is the input ABI used to generate the binding from.
-const BridgeCounterABI = "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"bridge_\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[],\"name\":\"bridge\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint8\",\"name\":\"\",\"type\":\"uint8\"}],\"name\":\"depositCounts\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint8\",\"name\":\"destinationChainID\",\"type\":\"uint8\"}],\"name\":\"incr\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"bridge_\",\"type\":\"address\"}],\"name\":\"setBridge\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint8\",\"name\":\"destinationChainID\",\"type\":\"uint8\"},{\"internalType\":\"uint64\",\"name\":\"start\",\"type\":\"uint64\"}],\"name\":\"setDestStartNonce\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
+const BridgeCounterABI = "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"approvedBridge\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint8\",\"name\":\"\",\"type\":\"uint8\"}],\"name\":\"depositCounts\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint8\",\"name\":\"destinationChainID\",\"type\":\"uint8\"}],\"name\":\"incr\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"bridge_\",\"type\":\"address\"}],\"name\":\"addBridge\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"bridge_\",\"type\":\"address\"}],\"name\":\"removeBridge\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint8\",\"name\":\"destinationChainID\",\"type\":\"uint8\"},{\"internalType\":\"uint64\",\"name\":\"start\",\"type\":\"uint64\"}],\"name\":\"setDestStartNonce\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
 
 // BridgeCounterBin is the compiled bytecode used for deploying new contracts.
-var BridgeCounterBin = "0x608060405234801561001057600080fd5b50604051610853380380610853833981810160405281019061003291906100ce565b806000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555033600160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555050610140565b6000815190506100c881610129565b92915050565b6000602082840312156100e057600080fd5b60006100ee848285016100b9565b91505092915050565b600061010282610109565b9050919050565b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b610132816100f7565b811461013d57600080fd5b50565b6107048061014f6000396000f3fe608060405234801561001057600080fd5b50600436106100625760003560e01c80633b8e78111461006757806371af5099146100835780638b8ddc7a146100b35780638da5cb5b146100e35780638dd1480214610101578063e78cea921461011d575b600080fd5b610081600480360381019061007c91906104d5565b61013b565b005b61009d600480360381019061009891906104ac565b61020f565b6040516100aa919061060a565b60405180910390f35b6100cd60048036038101906100c891906104ac565b6102ff565b6040516100da919061060a565b60405180910390f35b6100eb610326565b6040516100f891906105af565b60405180910390f35b61011b60048036038101906101169190610483565b61034c565b005b61012561041f565b60405161013291906105af565b60405180910390f35b600160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16146101cb576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016101c2906105ca565b60405180910390fd5b80600260008460ff1660ff16815260200190815260200160002060006101000a81548167ffffffffffffffff021916908367ffffffffffffffff1602179055505050565b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16146102a0576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610297906105ea565b60405180910390fd5b600260008360ff1660ff168152602001908152602001600020600081819054906101000a900467ffffffffffffffff1660010191906101000a81548167ffffffffffffffff021916908367ffffffffffffffff16021790559050919050565b60026020528060005260406000206000915054906101000a900467ffffffffffffffff1681565b600160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1681565b600160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16146103dc576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016103d3906105ca565b60405180910390fd5b806000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555050565b6000809054906101000a900473ffffffffffffffffffffffffffffffffffffffff1681565b60008135905061045381610689565b92915050565b600081359050610468816106a0565b92915050565b60008135905061047d816106b7565b92915050565b60006020828403121561049557600080fd5b60006104a384828501610444565b91505092915050565b6000602082840312156104be57600080fd5b60006104cc8482850161046e565b91505092915050565b600080604083850312156104e857600080fd5b60006104f68582860161046e565b925050602061050785828601610459565b9150509250929050565b61051a81610636565b82525050565b600061052d601483610625565b91507f73656e646572206973206e6f74202061646d696e0000000000000000000000006000830152602082019050919050565b600061056d601483610625565b91507f73656e646572206973206e6f74206272696467650000000000000000000000006000830152602082019050919050565b6105a981610668565b82525050565b60006020820190506105c46000830184610511565b92915050565b600060208201905081810360008301526105e381610520565b9050919050565b6000602082019050818103600083015261060381610560565b9050919050565b600060208201905061061f60008301846105a0565b92915050565b600082825260208201905092915050565b600061064182610648565b9050919050565b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b600067ffffffffffffffff82169050919050565b600060ff82169050919050565b61069281610636565b811461069d57600080fd5b50565b6106a981610668565b81146106b457600080fd5b50565b6106c08161067c565b81146106cb57600080fd5b5056fea2646970667358221220369f717b31e8f3ad8503ca4e75de37f6886ece37c499cfef9e157e4e3d0fc73064736f6c63430006040033"
+var BridgeCounterBin = "0x608060405234801561001057600080fd5b5033600160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550610872806100616000396000f3fe608060405234801561001057600080fd5b506004361061007d5760003560e01c80638b8ddc7a1161005b5780638b8ddc7a146100ea5780638da5cb5b1461011a5780639712fdf814610138578063b11fd910146101545761007d565b806304df017d146100825780633b8e78111461009e57806371af5099146100ba575b600080fd5b61009c600480360381019061009791906105bb565b610184565b005b6100b860048036038101906100b3919061060d565b610265565b005b6100d460048036038101906100cf91906105e4565b610339565b6040516100e1919061076c565b60405180910390f35b61010460048036038101906100ff91906105e4565b610425565b604051610111919061076c565b60405180910390f35b61012261044c565b60405161012f91906106f6565b60405180910390f35b610152600480360381019061014d91906105bb565b610472565b005b61016e600480360381019061016991906105bb565b61055c565b60405161017b9190610711565b60405180910390f35b600160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614610214576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161020b9061072c565b60405180910390fd5b6000808273ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060006101000a81549060ff021916905550565b600160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16146102f5576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016102ec9061072c565b60405180910390fd5b80600260008460ff1660ff16815260200190815260200160002060006101000a81548167ffffffffffffffff021916908367ffffffffffffffff1602179055505050565b60008060003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060009054906101000a900460ff166103c6576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016103bd9061074c565b60405180910390fd5b600260008360ff1660ff168152602001908152602001600020600081819054906101000a900467ffffffffffffffff1660010191906101000a81548167ffffffffffffffff021916908367ffffffffffffffff16021790559050919050565b60026020528060005260406000206000915054906101000a900467ffffffffffffffff1681565b600160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1681565b600160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614610502576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016104f99061072c565b60405180910390fd5b60016000808373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060006101000a81548160ff02191690831515021790555050565b60006020528060005260406000206000915054906101000a900460ff1681565b60008135905061058b816107f7565b92915050565b6000813590506105a08161080e565b92915050565b6000813590506105b581610825565b92915050565b6000602082840312156105cd57600080fd5b60006105db8482850161057c565b91505092915050565b6000602082840312156105f657600080fd5b6000610604848285016105a6565b91505092915050565b6000806040838503121561062057600080fd5b600061062e858286016105a6565b925050602061063f85828601610591565b9150509250929050565b61065281610798565b82525050565b610661816107aa565b82525050565b6000610674601483610787565b91507f73656e646572206973206e6f74202061646d696e0000000000000000000000006000830152602082019050919050565b60006106b4601483610787565b91507f73656e646572206973206e6f74206272696467650000000000000000000000006000830152602082019050919050565b6106f0816107d6565b82525050565b600060208201905061070b6000830184610649565b92915050565b60006020820190506107266000830184610658565b92915050565b6000602082019050818103600083015261074581610667565b9050919050565b60006020820190508181036000830152610765816106a7565b9050919050565b600060208201905061078160008301846106e7565b92915050565b600082825260208201905092915050565b60006107a3826107b6565b9050919050565b60008115159050919050565b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b600067ffffffffffffffff82169050919050565b600060ff82169050919050565b61080081610798565b811461080b57600080fd5b50565b610817816107d6565b811461082257600080fd5b50565b61082e816107ea565b811461083957600080fd5b5056fea2646970667358221220fd9e38515c12a0e52d0df66762ddd60f8c5e6ac0fa85c39f1fd48e083428c4cc64736f6c63430006040033"
 
 // DeployBridgeCounter deploys a new Ethereum contract, binding an instance of BridgeCounter to it.
-func DeployBridgeCounter(auth *bind.TransactOpts, backend bind.ContractBackend, bridge_ common.Address) (common.Address, *types.Transaction, *BridgeCounter, error) {
+func DeployBridgeCounter(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *BridgeCounter, error) {
 	parsed, err := abi.JSON(strings.NewReader(BridgeCounterABI))
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
 
-	address, tx, contract, err := bind.DeployContract(auth, parsed, common.FromHex(BridgeCounterBin), backend, bridge_)
+	address, tx, contract, err := bind.DeployContract(auth, parsed, common.FromHex(BridgeCounterBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
@@ -188,35 +188,35 @@ func (_BridgeCounter *BridgeCounterTransactorRaw) Transact(opts *bind.TransactOp
 	return _BridgeCounter.Contract.contract.Transact(opts, method, params...)
 }
 
-// Bridge is a free data retrieval call binding the contract method 0xe78cea92.
+// ApprovedBridge is a free data retrieval call binding the contract method 0xb11fd910.
 //
-// Solidity: function bridge() view returns(address)
-func (_BridgeCounter *BridgeCounterCaller) Bridge(opts *bind.CallOpts) (common.Address, error) {
+// Solidity: function approvedBridge(address ) view returns(bool)
+func (_BridgeCounter *BridgeCounterCaller) ApprovedBridge(opts *bind.CallOpts, arg0 common.Address) (bool, error) {
 	var out []interface{}
-	err := _BridgeCounter.contract.Call(opts, &out, "bridge")
+	err := _BridgeCounter.contract.Call(opts, &out, "approvedBridge", arg0)
 
 	if err != nil {
-		return *new(common.Address), err
+		return *new(bool), err
 	}
 
-	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
 
 	return out0, err
 
 }
 
-// Bridge is a free data retrieval call binding the contract method 0xe78cea92.
+// ApprovedBridge is a free data retrieval call binding the contract method 0xb11fd910.
 //
-// Solidity: function bridge() view returns(address)
-func (_BridgeCounter *BridgeCounterSession) Bridge() (common.Address, error) {
-	return _BridgeCounter.Contract.Bridge(&_BridgeCounter.CallOpts)
+// Solidity: function approvedBridge(address ) view returns(bool)
+func (_BridgeCounter *BridgeCounterSession) ApprovedBridge(arg0 common.Address) (bool, error) {
+	return _BridgeCounter.Contract.ApprovedBridge(&_BridgeCounter.CallOpts, arg0)
 }
 
-// Bridge is a free data retrieval call binding the contract method 0xe78cea92.
+// ApprovedBridge is a free data retrieval call binding the contract method 0xb11fd910.
 //
-// Solidity: function bridge() view returns(address)
-func (_BridgeCounter *BridgeCounterCallerSession) Bridge() (common.Address, error) {
-	return _BridgeCounter.Contract.Bridge(&_BridgeCounter.CallOpts)
+// Solidity: function approvedBridge(address ) view returns(bool)
+func (_BridgeCounter *BridgeCounterCallerSession) ApprovedBridge(arg0 common.Address) (bool, error) {
+	return _BridgeCounter.Contract.ApprovedBridge(&_BridgeCounter.CallOpts, arg0)
 }
 
 // DepositCounts is a free data retrieval call binding the contract method 0x8b8ddc7a.
@@ -281,6 +281,27 @@ func (_BridgeCounter *BridgeCounterCallerSession) Owner() (common.Address, error
 	return _BridgeCounter.Contract.Owner(&_BridgeCounter.CallOpts)
 }
 
+// AddBridge is a paid mutator transaction binding the contract method 0x9712fdf8.
+//
+// Solidity: function addBridge(address bridge_) returns()
+func (_BridgeCounter *BridgeCounterTransactor) AddBridge(opts *bind.TransactOpts, bridge_ common.Address) (*types.Transaction, error) {
+	return _BridgeCounter.contract.Transact(opts, "addBridge", bridge_)
+}
+
+// AddBridge is a paid mutator transaction binding the contract method 0x9712fdf8.
+//
+// Solidity: function addBridge(address bridge_) returns()
+func (_BridgeCounter *BridgeCounterSession) AddBridge(bridge_ common.Address) (*types.Transaction, error) {
+	return _BridgeCounter.Contract.AddBridge(&_BridgeCounter.TransactOpts, bridge_)
+}
+
+// AddBridge is a paid mutator transaction binding the contract method 0x9712fdf8.
+//
+// Solidity: function addBridge(address bridge_) returns()
+func (_BridgeCounter *BridgeCounterTransactorSession) AddBridge(bridge_ common.Address) (*types.Transaction, error) {
+	return _BridgeCounter.Contract.AddBridge(&_BridgeCounter.TransactOpts, bridge_)
+}
+
 // Incr is a paid mutator transaction binding the contract method 0x71af5099.
 //
 // Solidity: function incr(uint8 destinationChainID) returns(uint64)
@@ -302,25 +323,25 @@ func (_BridgeCounter *BridgeCounterTransactorSession) Incr(destinationChainID ui
 	return _BridgeCounter.Contract.Incr(&_BridgeCounter.TransactOpts, destinationChainID)
 }
 
-// SetBridge is a paid mutator transaction binding the contract method 0x8dd14802.
+// RemoveBridge is a paid mutator transaction binding the contract method 0x04df017d.
 //
-// Solidity: function setBridge(address bridge_) returns()
-func (_BridgeCounter *BridgeCounterTransactor) SetBridge(opts *bind.TransactOpts, bridge_ common.Address) (*types.Transaction, error) {
-	return _BridgeCounter.contract.Transact(opts, "setBridge", bridge_)
+// Solidity: function removeBridge(address bridge_) returns()
+func (_BridgeCounter *BridgeCounterTransactor) RemoveBridge(opts *bind.TransactOpts, bridge_ common.Address) (*types.Transaction, error) {
+	return _BridgeCounter.contract.Transact(opts, "removeBridge", bridge_)
 }
 
-// SetBridge is a paid mutator transaction binding the contract method 0x8dd14802.
+// RemoveBridge is a paid mutator transaction binding the contract method 0x04df017d.
 //
-// Solidity: function setBridge(address bridge_) returns()
-func (_BridgeCounter *BridgeCounterSession) SetBridge(bridge_ common.Address) (*types.Transaction, error) {
-	return _BridgeCounter.Contract.SetBridge(&_BridgeCounter.TransactOpts, bridge_)
+// Solidity: function removeBridge(address bridge_) returns()
+func (_BridgeCounter *BridgeCounterSession) RemoveBridge(bridge_ common.Address) (*types.Transaction, error) {
+	return _BridgeCounter.Contract.RemoveBridge(&_BridgeCounter.TransactOpts, bridge_)
 }
 
-// SetBridge is a paid mutator transaction binding the contract method 0x8dd14802.
+// RemoveBridge is a paid mutator transaction binding the contract method 0x04df017d.
 //
-// Solidity: function setBridge(address bridge_) returns()
-func (_BridgeCounter *BridgeCounterTransactorSession) SetBridge(bridge_ common.Address) (*types.Transaction, error) {
-	return _BridgeCounter.Contract.SetBridge(&_BridgeCounter.TransactOpts, bridge_)
+// Solidity: function removeBridge(address bridge_) returns()
+func (_BridgeCounter *BridgeCounterTransactorSession) RemoveBridge(bridge_ common.Address) (*types.Transaction, error) {
+	return _BridgeCounter.Contract.RemoveBridge(&_BridgeCounter.TransactOpts, bridge_)
 }
 
 // SetDestStartNonce is a paid mutator transaction binding the contract method 0x3b8e7811.

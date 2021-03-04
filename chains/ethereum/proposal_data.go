@@ -18,3 +18,16 @@ func ConstructErc20ProposalDataHash(handler ethCommon.Address, recipient ethComm
 	return common.Hash(data)
 
 }
+
+func ConstructErc721ProposalDataHash(handler ethCommon.Address, recipient ethCommon.Address, tokenId *big.Int, metadata []byte, feeAmount *big.Int) [32]byte {
+	var data []byte
+
+	data = append(data, handler[:]...)
+	data = append(data, recipient[:]...)
+	data = append(data, ethCommon.LeftPadBytes(tokenId.Bytes(), 32)...)
+	data = append(data, metadata...)
+	data = append(data, ethCommon.LeftPadBytes(feeAmount.Bytes(), 32)...)
+
+	return common.Hash(data)
+
+}

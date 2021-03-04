@@ -132,18 +132,20 @@ func (w *writer) hasVoted(srcId types.ChainId, nonce types.Nonce, dataHash [32]b
 	return false
 }
 
-func (w *writer) shouldVote(m types.FTTransfer) bool {
-	dataHash := ConstructTrc20ProposalDataHash(w.cfg.trc20HandlerContract, m.Recipient, m.Amount)
+func (w *writer) shouldVote(m types.TransferMsg) bool {
+	recipient := m.Payload[1]
+	amount := new(big.Int).SetBytes(m.Payload[0])
+	dataHash := ConstructTrc20ProposalDataHash(w.cfg.trc20HandlerContract, recipient, amount)
 
 	// Check if proposal has passed and skip if Passed or Transferred
 	if w.proposalIsComplete(m.SourceId, m.DepositNonce, dataHash) {
-		w.log.Info("Proposal complete, not voting", "src", m.SourceId, "nonce", m.DepositNonce)
+		w.log.Info("Proposal complete, not voting", "type", m.Type, "src", m.SourceId, "dst", m.DestinationId, "nonce", m.DepositNonce)
 		return false
 	}
 
 	// Check if relayer has previously voted
 	if w.hasVoted(m.SourceId, m.DepositNonce, dataHash) {
-		w.log.Info("Relayer has already voted, not voting", "src", m.SourceId, "nonce", m.DepositNonce)
+		w.log.Info("Relayer has already voted, not voting", "type", m.Type, "src", m.SourceId, "dst", m.DestinationId, "nonce", m.DepositNonce)
 		return false
 	}
 
@@ -168,20 +170,22 @@ func (w *writer) signTx(tx *core.Transaction) (*core.Transaction, error) {
 	return tx, nil
 }
 
-func (w *writer) commitVotes(m types.BatchVotes) (*api.TransactionExtention, error) {
+func (w *writer) commitVotes(m types.ProposalSignatures) (*api.TransactionExtention, error) {
 
 	signatureStrs := []string{}
 
 	for _, s := range m.Signatures {
 		signatureStrs = append(signatureStrs, hexutil.Encode(s)[2:])
 	}
+	recipient := m.Payload[1]
+	amount := new(big.Int).SetBytes(m.Payload[0])
 
 	params := []abi.Param{
 		{"uint8": strconv.FormatUint(uint64(m.SourceId), 10)},
 		{"uint64": strconv.FormatUint(uint64(m.DepositNonce), 10)},
 		{"bytes32": hexutil.Encode(m.ResourceId[:])[2:]},
-		{"address": tronCommon.EncodeCheck(m.Recipient)},
-		{"uint256": m.Amount.String()},
+		{"address": tronCommon.EncodeCheck(recipient)},
+		{"uint256": amount.String()},
 		{"bytes[]": signatureStrs},
 	}
 
@@ -200,8 +204,8 @@ func (w *writer) commitVotes(m types.BatchVotes) (*api.TransactionExtention, err
 		uint8(m.SourceId),
 		uint64(m.DepositNonce),
 		m.ResourceId,
-		ethCommon.BytesToAddress(m.Recipient[1:]),
-		m.Amount,
+		ethCommon.BytesToAddress(recipient[1:]),
+		amount,
 		m.Signatures)
 
 	if err != nil {
@@ -221,8 +225,8 @@ func (w *writer) commitVotes(m types.BatchVotes) (*api.TransactionExtention, err
 
 		if ret.Message == nil {
 			w.log.Info("commitVotes", "tx", hexutil.Encode(tx.GetTxid()), "src", m.SourceId, "dst", m.DestinationId, "nonce", m.DepositNonce,
-				"recipient", tronCommon.EncodeCheck(m.Recipient),
-				"amount", m.Amount.String())
+				"recipient", tronCommon.EncodeCheck(recipient),
+				"amount", amount.String())
 			return tx, nil
 		} else {
 			w.log.Warn("Broadcast  commitVotes tx err", "tx", hexutil.Encode(tx.GetTxid()), "src", m.SourceId, "depositNonce", m.DepositNonce, "err", string(ret.Message))
@@ -231,8 +235,8 @@ func (w *writer) commitVotes(m types.BatchVotes) (*api.TransactionExtention, err
 
 	} else {
 		w.log.Error("commitVotes", "tx", hexutil.Encode(tx.GetTxid()), "src", m.SourceId, "dst", m.DestinationId, "nonce", m.DepositNonce,
-			"recipient", hexutil.Encode(m.Recipient),
-			"amount", m.Amount.String(), "err", err)
+			"recipient", tronCommon.EncodeCheck(recipient),
+			"amount", amount.String(), "err", err)
 		return nil, err
 	}
 

@@ -20,7 +20,7 @@ func (es EventSig) GetTopic() (ret common.Hash) {
 const (
 	Deposit           EventSig = "Deposit(uint8,bytes32,uint64)"
 	ProposalEvent     EventSig = "ProposalEvent(uint8,uint64,uint8,bytes32,bytes32)"
-	SignProposalEvent EventSig = "SignProposalEvent(uint8,uint8,uint64,uint8)"
+	SignProposalEvent EventSig = "SignProposalEvent(uint8,uint8,uint64,uint8,uint8)"
 )
 
 type ProposalStatus int

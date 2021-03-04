@@ -19,6 +19,8 @@ package sero
 import (
 	"fmt"
 	"github.com/emit-technology/emit-cross/bindings/sero/Collector"
+	"github.com/emit-technology/emit-cross/bindings/sero/NFTBridge"
+	"github.com/emit-technology/emit-cross/bindings/sero/SRC721Handler"
 	"github.com/emit-technology/emit-cross/chains"
 	"github.com/emit-technology/emit-cross/common"
 	"github.com/emit-technology/emit-cross/core"
@@ -105,6 +107,11 @@ func InitializeChain(chainCfg *core.ChainConfig, chainDB *chains.ChainDB, logger
 		return nil, nil, err
 	}
 
+	nftBridgeContract, err := NFTBridge.NewNFTBridge(cfg.nftBridgeContract, conn.Client())
+	if err != nil {
+		return nil, nil, err
+	}
+
 	chainId, err := bridgeContract.ChainID(conn.CallOpts())
 	if err != nil {
 		return nil, nil, err
@@ -119,6 +126,10 @@ func InitializeChain(chainCfg *core.ChainConfig, chainDB *chains.ChainDB, logger
 		return nil, nil, err
 	}
 
+	src721HandlerContract, err := SRC721Handler.NewSRC721Handler(cfg.src721HandlerContract, conn.Client())
+	if err != nil {
+		return nil, nil, err
+	}
 	signatureCollectorContract, err := Collector.NewSignatureCollector(cfg.signatureColletorContact, conn.Client())
 	if err != nil {
 		return nil, nil, err
@@ -135,7 +146,7 @@ func InitializeChain(chainCfg *core.ChainConfig, chainDB *chains.ChainDB, logger
 	listener := NewListener(conn, chainDB, cfg, logger, stop, sysErr, m)
 
 	writer := NewWriter(conn, cfg, logger, stop, sysErr, m)
-	writer.setContract(bridgeContract, src20HandlerContract, signatureCollectorContract)
+	writer.setContract(bridgeContract, nftBridgeContract, src20HandlerContract, src721HandlerContract, signatureCollectorContract)
 
 	listener.setWriter(writer)
 

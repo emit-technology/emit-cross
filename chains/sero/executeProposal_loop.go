@@ -23,6 +23,7 @@ import (
 	"github.com/emit-technology/emit-cross/queue"
 	"github.com/emit-technology/emit-cross/types"
 	seroCommon "github.com/sero-cash/go-sero/common"
+	"math/big"
 	"time"
 )
 
@@ -44,9 +45,18 @@ func (l *listener) excueteProposal() error {
 				time.Sleep(BlockRetryInterval)
 				continue
 			}
-			dataHash := ConstructSrc20ProposalDataHash(l.cfg.src20HandlerContract, seroCommon.BytesToAddress(m.Recipient), m.Amount)
+			recipient := seroCommon.BytesToAddress(m.Payload[1])
+			amountOrTokenId := new(big.Int).SetBytes(m.Payload[0])
+			var dataHash [32]byte
+			if m.Type == types.FungibleTransfer {
+				dataHash = ConstructSRC20ProposalDataHash(l.cfg.src20HandlerContract, recipient, amountOrTokenId)
 
-			if !l.writer.proposalIsFinalized(m.SourceId, m.DepositNonce, dataHash) {
+			} else {
+				dataHash = ConstructSRC721ProposalDataHash(l.cfg.src721HandlerContract, recipient, amountOrTokenId, m.Payload[2])
+
+			}
+
+			if !l.writer.proposalIsFinalized(m.SourceId, m.DepositNonce, m.Type, dataHash) {
 				tx, err := l.writer.executeProposal(*m)
 				if err != nil {
 					l.log.Error("Failed to executeProposal", "id", nextId, "err", err)
@@ -62,9 +72,18 @@ func (l *listener) excueteProposal() error {
 
 }
 
-func (l *listener) wacthExecuteProposalResult(m types.FTTransfer, tx seroCommon.Hash) {
+func (l *listener) wacthExecuteProposalResult(m types.TransferMsg, tx seroCommon.Hash) {
 	begin := time.Now().Unix()
-	dataHash := ConstructSrc20ProposalDataHash(l.cfg.src20HandlerContract, seroCommon.BytesToAddress(m.Recipient), m.Amount)
+	recipient := seroCommon.BytesToAddress(m.Payload[1])
+	amountOrTokenId := new(big.Int).SetBytes(m.Payload[0])
+	var dataHash [32]byte
+	if m.Type == types.FungibleTransfer {
+		dataHash = ConstructSRC20ProposalDataHash(l.cfg.src20HandlerContract, recipient, amountOrTokenId)
+
+	} else {
+		dataHash = ConstructSRC721ProposalDataHash(l.cfg.src721HandlerContract, recipient, amountOrTokenId, m.Payload[2])
+
+	}
 	for {
 		if (time.Now().Unix() - begin) > int64(WatchDuration) {
 			l.log.Info("execute proposal not blocked,retry", "tx", tx.String(), "src", m.SourceId, "dst", m.DestinationId, "nonce", m.DepositNonce)
@@ -82,7 +101,7 @@ func (l *listener) wacthExecuteProposalResult(m types.FTTransfer, tx seroCommon.
 			continue
 		}
 
-		if l.writer.proposalIsFinalized(m.SourceId, m.DepositNonce, dataHash) {
+		if l.writer.proposalIsFinalized(m.SourceId, m.DepositNonce, m.Type, dataHash) {
 			l.log.Info("Proposal finalized on chain", "src", m.SourceId, "dst", m.DestinationId, "nonce", m.DepositNonce)
 			return
 		}
